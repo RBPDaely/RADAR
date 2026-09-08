@@ -157,8 +157,8 @@ export function App() {
         {/* Dual Layout Grid (Desktop vs Mobile) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 flex-1 min-h-0">
           
-          {/* LEFT / PRIMARY (72% width on desktop): TradingView Chart with Integrated Top UP/DOWN HUD */}
-          <section className={`lg:col-span-8 xl:col-span-8 2xl:col-span-9 flex flex-col h-full min-h-0 ${
+          {/* LEFT / PRIMARY (58% width on desktop): TradingView Chart with Integrated Top UP/DOWN HUD */}
+          <section className={`lg:col-span-7 xl:col-span-7 2xl:col-span-7 flex flex-col h-full min-h-0 ${
             mobileTab === 'chart' ? 'flex' : 'hidden lg:flex'
           }`}>
             <div className="flex-1 min-h-0 h-full w-full flex flex-col">
@@ -186,8 +186,8 @@ export function App() {
             </div>
           </section>
 
-          {/* RIGHT / SECONDARY (28% width on desktop): Order Execution + TWAP + OrderBook/Tape */}
-          <section className={`lg:col-span-4 xl:col-span-4 2xl:col-span-3 flex flex-col h-full min-h-0 space-y-2 ${
+          {/* RIGHT / SECONDARY (42% width on desktop): Order Execution + TWAP + OrderBook/Tape */}
+          <section className={`lg:col-span-5 xl:col-span-5 2xl:col-span-5 flex flex-col h-full min-h-0 space-y-2 ${
             mobileTab !== 'chart' ? 'flex' : 'hidden lg:flex'
           }`}>
             {/* Mobile-Only Tab Views */}
