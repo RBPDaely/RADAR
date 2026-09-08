@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CryptoAsset, RoundSettlementState, LatencyStats, ThemeMode } from '../types/market';
-import { Clock, Zap, Sun, Moon, TrendingUp, TrendingDown, Key } from 'lucide-react';
+import { Clock, Zap, Sun, Moon, TrendingUp, TrendingDown, Key, Wallet } from 'lucide-react';
 import { formatWindowTimeRange } from '../services/polymarketFeed';
 
 interface ProHeaderProps {
@@ -34,6 +34,29 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
   setShowPrediction,
   onOpenSettings,
 }) => {
+  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function checkBalance() {
+      try {
+        const res = await fetch('http://127.0.0.1:3001/api/credentials/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (active && data.usdcBalance !== undefined) {
+            setUsdcBalance(data.usdcBalance);
+          }
+        }
+      } catch {}
+    }
+    checkBalance();
+    const interval = setInterval(checkBalance, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const { secondsLeft, strikePrice, runningTwap, isUpWinning, isUrgent, isCritical, progressPct } = settlement;
 
   const minutes = Math.floor(secondsLeft / 60);
@@ -225,6 +248,22 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
             {isDark ? <Sun className="w-3 h-3 text-[#f0b90b]" /> : <Moon className="w-3 h-3 text-blue-600" />}
             <span className="font-black">{isDark ? 'LIGHT' : 'DARK'}</span>
           </button>
+
+          {/* Live USDC Balance Display */}
+          {usdcBalance !== null && (
+            <button
+              onClick={onOpenSettings}
+              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-black border transition-all ${
+                isDark
+                  ? 'bg-emerald-950/40 border-[#089981]/60 text-[#089981] hover:border-[#089981]'
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+              }`}
+              title="Saldo USDC Aktif (Klik untuk Kelola Kredensial)"
+            >
+              <Wallet className="w-3.5 h-3.5 text-[#089981]" />
+              <span>${usdcBalance.toFixed(2)}</span>
+            </button>
+          )}
 
           {/* Kredensial Settings Button */}
           <button
