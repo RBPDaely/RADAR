@@ -1,9 +1,11 @@
 export interface RadarCredentials {
   funderAddress: string; // Polymarket Gnosis Safe / Proxy address
-  signerPrivateKey: string; // Exported private key from Polymarket
+  signerPrivateKey: string; // Exported private key from reveal.magic.link/polymarket
+  builderSignerAddress?: string; // Optional: RELAYER_API_KEY_ADDRESS from Builder menu to verify match
   apiKey?: string;
   apiSecret?: string;
   apiPassphrase?: string;
+  signatureType?: number; // 0 = EOA, 1 = POLY_PROXY, 2 = POLY_GNOSIS_SAFE (default 2)
 }
 
 export interface OrderRequest {
@@ -32,6 +34,10 @@ export interface WalletStatus {
   hasCredentials: boolean;
   funderAddress?: string;
   signerAddress?: string;
+  builderSignerAddress?: string;
+  signerMatchesBuilder?: boolean;
+  signatureType?: number;
+  clobAuthValid?: boolean;
   usdcBalance?: number;
   proxyAllowance?: boolean;
   error?: string;
