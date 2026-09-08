@@ -42,6 +42,20 @@ const server = Bun.serve({
         return jsonResponse(status);
       }
 
+      // 2b. Auto-resolve Funder / Proxy Address from Signer Address
+      if (url.pathname === '/api/credentials/resolve-funder' && req.method === 'GET') {
+        const signerAddress = url.searchParams.get('signerAddress');
+        if (!signerAddress) {
+          return jsonResponse({ error: 'signerAddress is required' }, 400);
+        }
+        const proxyWallet = await clobManager.resolveProxyWallet(signerAddress);
+        return jsonResponse({
+          signerAddress,
+          proxyWallet: proxyWallet || signerAddress,
+          isDetected: !!proxyWallet,
+        });
+      }
+
       // 3. Save / Update Credentials
       if (url.pathname === '/api/credentials' && req.method === 'POST') {
         const body = (await req.json()) as RadarCredentials;
