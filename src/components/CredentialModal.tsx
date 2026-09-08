@@ -19,6 +19,7 @@ import {
   Check,
   HelpCircle,
   Info,
+  Sparkles,
 } from 'lucide-react';
 
 interface CredentialModalProps {
@@ -48,6 +49,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
   const [showSecret, setShowSecret] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isResolvingFunder, setIsResolvingFunder] = useState<boolean>(false);
   const [status, setStatus] = useState<{
     hasCredentials: boolean;
     funderAddress?: string;
@@ -91,6 +93,71 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
     }
   }, [isOpen]);
 
+  // Automatically attempt to detect Funder Address if empty and signer address is known
+  useEffect(() => {
+    const candidate = derivedSignerAddress || (builderSignerAddress.trim().startsWith('0x') ? builderSignerAddress.trim() : null);
+    if (candidate && !funderAddress) {
+      autoDetectFunder(candidate);
+    }
+  }, [derivedSignerAddress, builderSignerAddress]);
+
+  async function autoDetectFunder(targetAddr?: string) {
+    const addr = targetAddr || derivedSignerAddress || (builderSignerAddress.trim().startsWith('0x') ? builderSignerAddress.trim() : null);
+    if (!addr) {
+      setFeedback({
+        type: 'error',
+        message: 'Masukkan Signer Private Key atau Alamat Signer menu Builder terlebih dahulu untuk deteksi otomatis.',
+      });
+      return;
+    }
+
+    setIsResolvingFunder(true);
+    try {
+      // 1. Try sidecar resolution
+      try {
+        const res = await fetch(`http://127.0.0.1:3001/api/credentials/resolve-funder?signerAddress=${addr}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.proxyWallet && data.isDetected) {
+            setFunderAddress(data.proxyWallet);
+            setFeedback({
+              type: 'success',
+              message: `Funder Address (Proxy Safe) berhasil terdeteksi otomatis: ${data.proxyWallet.slice(0, 10)}...${data.proxyWallet.slice(-6)}`,
+            });
+            setIsResolvingFunder(false);
+            return;
+          }
+        }
+      } catch {}
+
+      // 2. Direct public Polymarket API query
+      const directRes = await fetch(`https://polymarket.com/api/profile/userData?address=${addr.toLowerCase()}`);
+      if (directRes.ok) {
+        const d = await directRes.json();
+        if (d && d.proxyWallet && ethers.isAddress(d.proxyWallet)) {
+          setFunderAddress(d.proxyWallet);
+          setFeedback({
+            type: 'success',
+            message: `Funder Address (Proxy Safe) terdeteksi dari profil Polymarket: ${d.proxyWallet.slice(0, 10)}...${d.proxyWallet.slice(-6)}`,
+          });
+          setIsResolvingFunder(false);
+          return;
+        }
+      }
+
+      // 3. Fallback: if no proxy, use signer address
+      setFunderAddress(addr);
+      setFeedback({
+        type: 'success',
+        message: `Funder Address menggunakan alamat signer: ${addr.slice(0, 10)}...${addr.slice(-6)}`,
+      });
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: `Gagal deteksi otomatis: ${err.message}` });
+    } finally {
+      setIsResolvingFunder(false);
+    }
+  }
+
   async function fetchStatus() {
     try {
       const res = await fetch('http://127.0.0.1:3001/api/credentials/status');
@@ -129,7 +196,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          funderAddress: funderAddress.trim(),
+          funderAddress: funderAddress.trim() || undefined,
           signerPrivateKey: signerPrivateKey.trim(),
           builderSignerAddress: builderSignerAddress.trim() || undefined,
           apiKey: apiKey.trim() || undefined,
@@ -222,7 +289,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Panduan Akun Email / 2FA (Magic Link)</span>
+            <span>Panduan &amp; Cara Dapatkan Alamat</span>
           </button>
         </div>
 
@@ -234,19 +301,49 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
               <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-200 text-xs flex items-start space-x-2.5">
                 <Info className="w-5 h-5 text-[#f0b90b] flex-shrink-0 mt-0.5" />
                 <div>
-                  <strong className="text-white block mb-1">Mengapa Menu BUILDER Saja Belum Cukup?</strong>
-                  Menu <strong>BUILDER</strong> di Polymarket memberikan Anda API KEY L2 dan Public Address (Alamat Signer).
-                  Namun, pesanan trading Polymarket adalah smart contract order berbasis <strong>EIP-712</strong> yang wajib ditandatangani dengan <strong>Private Key</strong>. Menu Builder sengaja tidak menampilkan Private Key demi keamanan browser Anda.
+                  <strong className="text-white block mb-1">Panduan Alamat Funder &amp; Signer</strong>
+                  Anda tidak perlu bingung mencari Funder Address. RADAR sudah dilengkapi fitur deteksi otomatis langsung dari akun Anda!
                 </div>
               </div>
 
               <div className="space-y-3 text-[#d1d4dc]">
-                <h4 className="font-bold text-white text-sm flex items-center space-x-2">
-                  <span className="w-5 h-5 rounded-full bg-[#f0b90b] text-black text-[11px] font-black flex items-center justify-center">1</span>
-                  <span>Ambil Signer Private Key dari Portal Resmi Magic Link:</span>
+                {/* Bagian Funder Address */}
+                <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-950/20 space-y-2">
+                  <h4 className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-blue-400" />
+                    <span>Cara 1: Deteksi Otomatis Funder (Paling Mudah)</span>
+                  </h4>
+                  <p className="text-[#a0aec0] text-[11px] leading-relaxed">
+                    Anda <strong>TIDAK PERLU</strong> mengisi Funder Address secara manual! Cukup masukkan <strong>Signer Private Key</strong> atau <strong>Alamat Signer</strong> menu Builder Anda, lalu klik tombol <strong>⚡ Deteksi Otomatis</strong> di form. RADAR akan memanggil API Polymarket dan mengisi Funder Address Anda secara instan.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl border border-slate-800 bg-[#181c27] space-y-2">
+                  <h4 className="font-bold text-white text-sm flex items-center space-x-2">
+                    <Wallet className="w-4 h-4 text-[#f0b90b]" />
+                    <span>Cara 2: Melihat Funder Address di Web Polymarket Secara Manual</span>
+                  </h4>
+                  <ul className="list-disc pl-5 space-y-1.5 text-[#a0aec0] text-[11px]">
+                    <li>
+                      <strong>Melalui Tombol Deposit (Paling Cepat)</strong>:
+                      <br />
+                      Buka situs Polymarket di browser, klik tombol biru <strong>"Deposit"</strong> di pojok kanan atas.
+                      Pilih tab <strong>"Crypto"</strong>. Di layar akan tertera alamat: <em>"Send to your Polygon address: <code>0x...</code>"</em>. Alamat deposit inilah Funder Address Anda!
+                    </li>
+                    <li>
+                      <strong>Melalui Halaman Profil</strong>:
+                      <br />
+                      Klik avatar/foto profil Anda di pojok kanan atas -&gt; pilih <strong>"Profile"</strong>. Tepat di bawah nama pengguna Anda, ada deretan alamat <code>0x...</code> dengan tombol salin (copy).
+                    </li>
+                  </ul>
+                </div>
+
+                <h4 className="font-bold text-white text-sm flex items-center space-x-2 pt-2 border-t border-slate-800">
+                  <span className="w-5 h-5 rounded-full bg-[#f0b90b] text-black text-[11px] font-black flex items-center justify-center">!</span>
+                  <span>Ambil Signer Private Key dari Portal Magic Link:</span>
                 </h4>
                 <p className="text-[#787b86] pl-7">
-                  Polymarket menggunakan <strong>Magic Link</strong> untuk akun Email + 2FA / Google. Magic menyediakan portal resmi mandiri untuk mengekspor Private Key Anda:
+                  Buka portal resmi Magic Link Polymarket di browser Anda:
                 </p>
                 <div className="pl-7">
                   <a
@@ -260,55 +357,18 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                   </a>
                 </div>
                 <ul className="list-disc pl-11 space-y-1 text-[#787b86]">
-                  <li>Buka link di atas di browser Anda.</li>
-                  <li>Masukkan <strong>alamat email</strong> yang sama persis dengan akun Polymarket Anda.</li>
-                  <li>Masukkan kode 6 digit verifikasi (OTP) dari email / 2FA Anda.</li>
-                  <li>
-                    Magic Link akan menampilkan:
-                    <br />
-                    - <strong>Public Address</strong>: Alamat ini <em>pasti sama</em> dengan <code>Alamat Signer</code> di menu BUILDER Anda.
-                    <br />
-                    - <strong>Private Key</strong>: Kode rahasia 64 karakter (diawali <code>0x...</code>).
-                  </li>
-                  <li>Salin <strong>Private Key</strong> tersebut ke kolom Form Input RADAR.</li>
+                  <li>Masukkan <strong>email akun Polymarket</strong> Anda.</li>
+                  <li>Masukkan kode 6 digit OTP dari email Anda.</li>
+                  <li>Salin <strong>Private Key</strong> 64 karakter (diawali <code>0x...</code>) ke form RADAR.</li>
                 </ul>
-
-                <h4 className="font-bold text-white text-sm flex items-center space-x-2 pt-2 border-t border-slate-800">
-                  <span className="w-5 h-5 rounded-full bg-[#f0b90b] text-black text-[11px] font-black flex items-center justify-center">2</span>
-                  <span>Ambil Alamat Safe / Funder (Tempat Saldo USDC.e):</span>
-                </h4>
-                <p className="text-[#787b86] pl-7">
-                  Buka profil Polymarket Anda di{' '}
-                  <a
-                    href="https://polymarket.com/profile"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[#f0b90b] underline"
-                  >
-                    polymarket.com/profile
-                  </a>
-                  . Salin alamat dompet profil Anda (misal <code>0x...</code>). Ini adalah dompet smart contract yang memegang saldo modal USDC.e Anda.
-                </p>
-
-                <h4 className="font-bold text-white text-sm flex items-center space-x-2 pt-2 border-t border-slate-800">
-                  <span className="w-5 h-5 rounded-full bg-[#f0b90b] text-black text-[11px] font-black flex items-center justify-center">3</span>
-                  <span>Salin API Key &amp; Secret dari Menu BUILDER:</span>
-                </h4>
-                <p className="text-[#787b86] pl-7">
-                  Di akun Polymarket Anda pada menu <strong>Settings -&gt; BUILDER</strong>:
-                  <br />
-                  - Salin <strong>API KEY</strong>, <strong>secret</strong>, dan <strong>passphrase</strong> ke form RADAR.
-                  <br />
-                  - Kredensial ini digunakan untuk autentikasi level 2 CLOB tanpa perlu query sign-in berulang.
-                </p>
 
                 <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => setActiveTab('form')}
-                    className="w-full py-2 rounded-lg bg-[#f0b90b] text-black font-black text-xs hover:bg-[#e0ad0a] transition-colors"
+                    className="w-full py-2.5 rounded-lg bg-[#f0b90b] text-black font-black text-xs hover:bg-[#e0ad0a] transition-colors"
                   >
-                    Saya Mengerti, Lanjutkan ke Form Input →
+                    Saya Mengerti, Kembali ke Form Input →
                   </button>
                 </div>
               </div>
@@ -329,12 +389,27 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
               <div className="space-y-3">
                 {/* 1. Funder / Safe Address */}
                 <div>
-                  <label className="block text-[10px] text-[#787b86] font-bold uppercase mb-1">
-                    1. FUNDER ADDRESS (Alamat Safe Profil Polymarket): *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-[#787b86] font-bold uppercase">
+                      1. FUNDER ADDRESS (Proxy Safe - Boleh Kosong / Auto-Detect):
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => autoDetectFunder()}
+                      disabled={isResolvingFunder}
+                      className="text-[10px] text-[#f0b90b] hover:underline flex items-center space-x-1 font-bold"
+                    >
+                      {isResolvingFunder ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-[#f0b90b]" />
+                      ) : (
+                        <Sparkles className="w-3 h-3 text-[#f0b90b]" />
+                      )}
+                      <span>{isResolvingFunder ? 'Mendeteksi...' : '⚡ Deteksi Otomatis'}</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
-                    placeholder="0x... (Alamat dompet profil Anda tempat saldo USDC.e berada)"
+                    placeholder="Boleh kosongkan (RADAR akan mendeteksi otomatis dari Signer Address)"
                     value={funderAddress}
                     onChange={(e) => setFunderAddress(e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg border text-xs font-mono outline-none transition-all ${
@@ -343,18 +418,11 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                         : 'bg-white border-slate-300 text-slate-900 focus:border-[#f0b90b]'
                     }`}
                   />
-                  <span className="text-[10px] text-[#787b86] mt-0.5 block">
-                    Cek di{' '}
-                    <a
-                      href="https://polymarket.com/profile"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[#f0b90b] underline inline-flex items-center space-x-0.5"
-                    >
-                      <span>polymarket.com/profile</span>
-                      <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
-                    </a>
-                  </span>
+                  <div className="flex items-center justify-between text-[10px] text-[#787b86] mt-1">
+                    <span>
+                      Cara Manual: Buka <strong>polymarket.com</strong> -&gt; klik tombol <strong>Deposit</strong> (kanan atas) -&gt; salin alamat Polygon.
+                    </span>
+                  </div>
                 </div>
 
                 {/* 2. Signer Private Key */}
@@ -396,7 +464,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                   {derivedSignerAddress && (
                     <div className="mt-1 p-1.5 rounded bg-blue-950/30 border border-blue-500/30 text-[10px] text-blue-300 flex items-center justify-between">
                       <span>
-                        Alamat Publik Terdeteksi: <strong className="text-white font-mono">{derivedSignerAddress}</strong>
+                        Alamat Signer Anda: <strong className="text-white font-mono">{derivedSignerAddress}</strong>
                       </span>
                       {doesSignerMatchBuilder === true && (
                         <span className="text-emerald-400 font-bold flex items-center space-x-1">
