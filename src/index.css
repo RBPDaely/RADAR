@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-bg-primary: #080b11;
+    --color-bg-secondary: #0e131f;
+    --color-bg-tertiary: #141b2b;
+    --color-border: #1c2538;
+    --color-border-hover: #2a3752;
+    --color-green: #10b981;
+    --color-red: #f43f5e;
+    --color-amber: #f59e0b;
+    --color-cyan: #06b6d4;
+    --color-purple: #a855f7;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #07090e;
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080b11;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c2538;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a3752;
+}
+
+/* Trading Ticker Flash Animations */
+@keyframes flash-green {
+  0% { background-color: rgba(16, 185, 129, 0.35); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { background-color: rgba(244, 63, 94, 0.35); }
+  100% { background-color: transparent; }
+}
+
+.flash-up {
+  animation: flash-green 0.75s ease-out;
+}
+
+.flash-down {
+  animation: flash-red 0.75s ease-out;
+}
+
+/* Pulse Glow for Countdown */
+@keyframes pulse-glow-red {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(244, 63, 94, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(244, 63, 94, 0.65);
+  }
+}
+
+.glow-urgent {
+  animation: pulse-glow-red 1.2s infinite ease-in-out;
+}
+
