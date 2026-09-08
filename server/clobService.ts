@@ -38,7 +38,20 @@ class ClobServiceManager {
       }
 
       this.signer = new Wallet(cleanKey, this.provider);
-      const funder = creds.funderAddress ? creds.funderAddress.trim() : this.signer.address;
+      
+      // Auto-resolve funder address from Polymarket profile API if empty
+      let funder = creds.funderAddress ? creds.funderAddress.trim() : '';
+      if (!funder) {
+        console.log(`[Sidecar] Resolving funder/proxy wallet for signer ${this.signer.address}...`);
+        const autoFunder = await this.resolveProxyWallet(this.signer.address);
+        if (autoFunder) {
+          console.log(`[Sidecar] Auto-resolved funder address: ${autoFunder}`);
+          funder = autoFunder;
+          creds.funderAddress = autoFunder;
+        } else {
+          funder = this.signer.address;
+        }
+      }
 
       let apiCreds = undefined;
       if (creds.apiKey && creds.apiSecret && creds.apiPassphrase) {
@@ -275,6 +288,22 @@ class ClobServiceManager {
     } catch (e: any) {
       return { success: false, message: e.message || 'Gagal membatalkan order' };
     }
+  }
+
+  public async resolveProxyWallet(signerAddress: string): Promise<string | null> {
+    try {
+      const clean = signerAddress.trim().toLowerCase();
+      const res = await fetch(`https://polymarket.com/api/profile/userData?address=${clean}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.proxyWallet && ethers.isAddress(data.proxyWallet)) {
+          return data.proxyWallet;
+        }
+      }
+    } catch (e) {
+      console.warn('[CLOB] Error resolving proxy wallet:', e);
+    }
+    return null;
   }
 }
 
