@@ -70,6 +70,8 @@ describe('TWAP Engine & Candle Sanitation Tests', () => {
 
 describe('RADAR Local Storage & Security Tests', () => {
   it('should save, load, and purge credentials without exposure', () => {
+    const existing = loadCredentials();
+
     const testCreds = {
       funderAddress: '0x1234567890123456789012345678901234567890',
       signerPrivateKey: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd',
@@ -94,5 +96,10 @@ describe('RADAR Local Storage & Security Tests', () => {
 
     const empty = loadCredentials();
     expect(empty).toBeNull();
+
+    // Restore existing user credentials if any
+    if (existing) {
+      saveCredentials(existing);
+    }
   });
 });
