@@ -194,15 +194,18 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         </div>
         
         {/* Status Badge */}
-        <div className="flex items-center space-x-1.5">
-          <span className={`w-2 h-2 rounded-full ${sidecarConnected ? 'bg-[#089981] animate-pulse' : 'bg-[#f23645]'}`} />
-          <span className={`text-[9px] font-bold ${sidecarConnected ? 'text-[#089981]' : 'text-[#f23645]'}`}>
-            {sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}
-          </span>
-          {usdcBalance !== null && (
-            <span className="text-[9px] text-[#787b86] font-bold pl-1">
-              ${usdcBalance.toFixed(2)}
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
+            <span className={`w-2 h-2 rounded-full ${sidecarConnected ? 'bg-[#089981] animate-pulse' : 'bg-[#f23645]'}`} />
+            <span className={`text-[9px] font-bold ${sidecarConnected ? 'text-[#089981]' : 'text-[#f23645]'}`}>
+              {sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}
             </span>
+          </div>
+          {usdcBalance !== null && (
+            <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-emerald-950/40 border border-[#089981]/50 text-[#089981]">
+              <span className="text-[9px] font-bold text-[#787b86]">SALDO:</span>
+              <strong className="text-[10px] font-mono text-white font-black">${usdcBalance.toFixed(2)}</strong>
+            </div>
           )}
         </div>
       </div>
