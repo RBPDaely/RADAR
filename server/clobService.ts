@@ -1,5 +1,5 @@
 import { Wallet, ethers } from 'ethers';
-import { ClobClient, Side, OrderType, SignatureType } from '@polymarket/clob-client';
+import { ClobClient, Side, OrderType, SignatureType, AssetType } from '@polymarket/clob-client';
 import { RadarCredentials, OrderRequest, OrderResponse, WalletStatus } from './types';
 import { loadCredentials, saveCredentials } from './storage';
 
@@ -43,20 +43,25 @@ class ClobServiceManager {
       let apiCreds = undefined;
       if (creds.apiKey && creds.apiSecret && creds.apiPassphrase) {
         apiCreds = {
-          key: creds.apiKey,
-          secret: creds.apiSecret,
-          passphrase: creds.apiPassphrase,
+          key: creds.apiKey.trim(),
+          secret: creds.apiSecret.trim(),
+          passphrase: creds.apiPassphrase.trim(),
         };
       }
 
+      // Default to SignatureType.POLY_GNOSIS_SAFE (2) for modern email accounts, fallback to POLY_PROXY (1) or EOA (0)
+      let chosenSigType = creds.signatureType !== undefined ? creds.signatureType : SignatureType.POLY_GNOSIS_SAFE;
+      if (funder.toLowerCase() === this.signer.address.toLowerCase() && creds.signatureType === undefined) {
+        chosenSigType = SignatureType.EOA;
+      }
+
       // Initialize CLOB client for Polygon (Chain ID 137)
-      // Using SignatureType.POLY_PROXY (1) for Email/Google Polymarket proxy wallets
       this.client = new ClobClient(
         'https://clob.polymarket.com',
         137,
         this.signer as any,
         apiCreds,
-        SignatureType.POLY_PROXY,
+        chosenSigType,
         funder
       );
 
@@ -77,6 +82,36 @@ class ClobServiceManager {
         }
       }
 
+      // Verify CLOB L2 authentication & test signature type fallback if needed
+      try {
+        await this.client.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
+      } catch (testErr: any) {
+        console.warn(`[Sidecar] Test with signatureType ${chosenSigType} notice:`, testErr.message || testErr);
+        // If modern SAFE failed, try POLY_PROXY fallback
+        if (chosenSigType === SignatureType.POLY_GNOSIS_SAFE) {
+          try {
+            console.log('[Sidecar] Testing fallback to POLY_PROXY (1)...');
+            const fallbackClient = new ClobClient(
+              'https://clob.polymarket.com',
+              137,
+              this.signer as any,
+              apiCreds || (this.client as any).creds,
+              SignatureType.POLY_PROXY,
+              funder
+            );
+            await fallbackClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
+            this.client = fallbackClient;
+            chosenSigType = SignatureType.POLY_PROXY;
+            creds.signatureType = chosenSigType;
+            saveCredentials(creds);
+            console.log('[Sidecar] Successfully verified using POLY_PROXY!');
+          } catch (fallbackErr) {
+            console.warn('[Sidecar] Fallback test notice:', fallbackErr);
+          }
+        }
+      }
+
+      creds.signatureType = chosenSigType;
       this.currentCreds = creds;
       return { success: true };
     } catch (err: any) {
@@ -95,9 +130,12 @@ class ClobServiceManager {
     try {
       const funder = this.currentCreds.funderAddress || this.signer.address;
       const signerAddr = this.signer.address;
+      const builderAddr = this.currentCreds.builderSignerAddress?.trim();
+      const signerMatchesBuilder = builderAddr ? builderAddr.toLowerCase() === signerAddr.toLowerCase() : undefined;
 
       let usdcBalance = 0;
       let hasAllowance = false;
+      let clobAuthValid = false;
 
       try {
         const usdcContract = new ethers.Contract(USDC_E_POLYGON, ERC20_ABI, this.provider);
@@ -110,10 +148,24 @@ class ClobServiceManager {
         console.warn('[Sidecar] Polygon RPC check notice:', rpcErr);
       }
 
+      // Check CLOB auth
+      if (this.client) {
+        try {
+          await this.client.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
+          clobAuthValid = true;
+        } catch (clobErr) {
+          // not fatal
+        }
+      }
+
       return {
         hasCredentials: true,
         funderAddress: funder,
         signerAddress: signerAddr,
+        builderSignerAddress: builderAddr,
+        signerMatchesBuilder,
+        signatureType: this.currentCreds.signatureType,
+        clobAuthValid,
         usdcBalance,
         proxyAllowance: hasAllowance,
       };
