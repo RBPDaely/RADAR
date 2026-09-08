@@ -13,7 +13,9 @@ export interface OrderRequest {
   outcome: 'UP' | 'DOWN';
   tokenId: string;
   orderType: 'MARKET' | 'LIMIT';
-  amountUsd: number;
+  amountUsd?: number;
+  shares?: number;
+  side?: 'BUY' | 'SELL';
   limitPrice?: number; // Price in decimal (e.g. 0.55 for 55c)
   slippageTolerance?: number; // e.g. 0.01 for 1%
 }
