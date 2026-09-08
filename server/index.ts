@@ -83,21 +83,27 @@ const server = Bun.serve({
         return jsonResponse({ success: true, message: 'Seluruh kredensial lokal berhasil dihapus.' });
       }
 
-      // 5. BUY Order
+      // 5. Positions
+      if (url.pathname === '/api/positions' && req.method === 'GET') {
+        const positions = await clobManager.getUserPositions();
+        return jsonResponse({ success: true, positions });
+      }
+
+      // 6. BUY Order
       if (url.pathname === '/api/order/buy' && req.method === 'POST') {
         const body = (await req.json()) as OrderRequest;
         const result = await clobManager.executeOrder(body, 'BUY');
         return jsonResponse(result, result.success ? 200 : 400);
       }
 
-      // 6. SELL Order
+      // 7. SELL Order
       if (url.pathname === '/api/order/sell' && req.method === 'POST') {
         const body = (await req.json()) as OrderRequest;
         const result = await clobManager.executeOrder(body, 'SELL');
         return jsonResponse(result, result.success ? 200 : 400);
       }
 
-      // 7. Cancel Order
+      // 8. Cancel Order
       if (url.pathname.startsWith('/api/order/') && req.method === 'DELETE') {
         const orderId = url.pathname.replace('/api/order/', '');
         if (!orderId) return jsonResponse({ success: false, message: 'Order ID tidak ditemukan' }, 400);
