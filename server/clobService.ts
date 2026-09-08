@@ -1,5 +1,5 @@
 import { Wallet, ethers } from 'ethers';
-import { ClobClient, Side, OrderType, SignatureType, AssetType } from '@polymarket/clob-client';
+import { ClobClient, Side, OrderType, SignatureTypeV2, AssetType, UserOrderV2, UserMarketOrderV2 } from '@polymarket/clob-client-v2';
 import { RadarCredentials, OrderRequest, OrderResponse, WalletStatus } from './types';
 import { loadCredentials, saveCredentials } from './storage';
 
@@ -39,7 +39,7 @@ class ClobServiceManager {
 
       this.signer = new Wallet(cleanKey, this.provider);
 
-      // Ethers v6 compatibility patch for @polymarket/clob-client
+      // Ethers v6 compatibility patch for @polymarket/clob-client-v2
       (this.signer as any)._signTypedData = (domain: any, types: any, value: any) => {
         const cleanTypes = { ...types };
         delete cleanTypes.EIP712Domain;
@@ -63,27 +63,28 @@ class ClobServiceManager {
       }
 
       // Try user signatureType or test POLY_PROXY / POLY_GNOSIS_SAFE
-      let chosenSigType = creds.signatureType !== undefined ? creds.signatureType : SignatureType.POLY_PROXY;
+      let chosenSigType: SignatureTypeV2 = creds.signatureType !== undefined ? (creds.signatureType as SignatureTypeV2) : SignatureTypeV2.POLY_PROXY;
       if (funder.toLowerCase() === this.signer.address.toLowerCase() && creds.signatureType === undefined) {
-        chosenSigType = SignatureType.EOA;
+        chosenSigType = SignatureTypeV2.EOA;
       }
 
-      // Initialize CLOB client
-      this.client = new ClobClient(
-        'https://clob.polymarket.com',
-        137,
-        this.signer as any,
-        apiCreds,
-        chosenSigType,
-        funder
-      );
+      // Initialize CLOB v2 client
+      this.client = new ClobClient({
+        host: 'https://clob.polymarket.com',
+        chain: 137,
+        signer: this.signer as any,
+        creds: apiCreds,
+        signatureType: chosenSigType,
+        funderAddress: funder,
+        throwOnError: true,
+      });
 
       // Check if API credentials work or need to be derived/created via L1 signature
       let testSuccess = false;
       if (apiCreds) {
         try {
           const testRes = await this.client.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
-          if (testRes && !testRes.error) {
+          if (testRes && !(testRes as any).error) {
             testSuccess = true;
           }
         } catch (e) {
@@ -105,14 +106,15 @@ class ClobServiceManager {
               secret: derived.secret,
               passphrase: derived.passphrase,
             };
-            this.client = new ClobClient(
-              'https://clob.polymarket.com',
-              137,
-              this.signer as any,
-              apiCreds,
-              chosenSigType,
-              funder
-            );
+            this.client = new ClobClient({
+              host: 'https://clob.polymarket.com',
+              chain: 137,
+              signer: this.signer as any,
+              creds: apiCreds,
+              signatureType: chosenSigType,
+              funderAddress: funder,
+              throwOnError: true,
+            });
             console.log('[Sidecar] API Key derived successfully:', derived.key.slice(0, 8) + '...');
           }
         } catch (e: any) {
@@ -121,19 +123,20 @@ class ClobServiceManager {
       }
 
       // Auto-detect whether POLY_PROXY (1) or POLY_GNOSIS_SAFE (2) holds the balance
-      const sigTypesToTry = [chosenSigType, SignatureType.POLY_PROXY, SignatureType.POLY_GNOSIS_SAFE];
+      const sigTypesToTry = [chosenSigType, SignatureTypeV2.POLY_PROXY, SignatureTypeV2.POLY_GNOSIS_SAFE];
       for (const st of sigTypesToTry) {
         try {
-          const candidateClient = new ClobClient(
-            'https://clob.polymarket.com',
-            137,
-            this.signer as any,
-            apiCreds,
-            st,
-            funder
-          );
+          const candidateClient = new ClobClient({
+            host: 'https://clob.polymarket.com',
+            chain: 137,
+            signer: this.signer as any,
+            creds: apiCreds,
+            signatureType: st,
+            funderAddress: funder,
+            throwOnError: true,
+          });
           const balRes = await candidateClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
-          if (balRes && !balRes.error) {
+          if (balRes && !(balRes as any).error) {
             const numBal = parseFloat(balRes.balance || '0');
             console.log(`[Sidecar] Checked signatureType ${st}: balance = ${numBal / 1e6}`);
             if (numBal > 0 || st === chosenSigType) {
@@ -250,14 +253,10 @@ class ClobServiceManager {
         return { success: false, message: 'Token ID pasar tidak ditemukan.' };
       }
 
-      if (amountUsd <= 0) {
-        return { success: false, message: 'Nominal modal harus lebih besar dari $0.' };
-      }
+      // Determine base price
+      let rawPrice = limitPrice && limitPrice > 0 && limitPrice < 1 ? limitPrice : 0.50;
 
-      // Determine price
-      let executionPrice = limitPrice && limitPrice > 0 && limitPrice < 1 ? limitPrice : 0.50;
-
-      // If Market order, fetch latest midpoint or top ask/bid from CLOB
+      // If Market order, fetch latest midpoint from CLOB
       if (req.orderType === 'MARKET') {
         try {
           const midRes = await fetch(`https://clob.polymarket.com/midpoint?token_id=${tokenId}`);
@@ -268,7 +267,7 @@ class ClobServiceManager {
               if (!isNaN(mid) && mid > 0 && mid < 1) {
                 // Apply slight slippage buffer for instant fill
                 const buffer = side === 'BUY' ? (req.slippageTolerance || 0.015) : -(req.slippageTolerance || 0.015);
-                executionPrice = Math.min(0.99, Math.max(0.01, mid + buffer));
+                rawPrice = Math.min(0.99, Math.max(0.01, mid + buffer));
               }
             }
           }
@@ -277,41 +276,116 @@ class ClobServiceManager {
         }
       }
 
-      // Calculate shares (contracts): Amount ($) / Price ($)
-      const rawShares = amountUsd / executionPrice;
-      // Round shares to 2 decimals for precision
-      const shares = Math.floor(rawShares * 100) / 100;
-      const actualCost = parseFloat((shares * executionPrice).toFixed(4));
-      const potentialPayout = side === 'BUY' ? parseFloat((shares * 1.00).toFixed(2)) : 0;
-      const potentialProfit = side === 'BUY' ? parseFloat((potentialPayout - actualCost).toFixed(2)) : 0;
+      // Polymarket binary options tickSize is 0.01 (strictly 2 decimals)
+      const executionPrice = Math.min(0.99, Math.max(0.01, Math.round(rawPrice * 100) / 100));
 
-      console.log(`[Sidecar] Executing ${side} for ${shares} shares @ $${executionPrice} (Total: $${actualCost})`);
+      let response: any;
+      let shares = 0;
+      let actualCost = 0;
 
-      // Construct order payload for Polymarket CLOB
-      const userOrder = {
-        tokenID: tokenId,
-        price: parseFloat(executionPrice.toFixed(3)),
-        size: shares,
-        side: side === 'BUY' ? Side.BUY : Side.SELL,
-      };
+      if (req.orderType === 'MARKET') {
+        if (side === 'BUY') {
+          // Polymarket CLOB V2 Market Buy:
+          // 'amount' is collateral USD, must be >= $1.00 USD and has MAX 2 DECIMALS accuracy.
+          actualCost = Math.round(Math.max(1.00, amountUsd || 1.00) * 100) / 100;
+          shares = parseFloat((actualCost / executionPrice).toFixed(4));
 
-      // Create and submit order to Polymarket CLOB
-      const response = await this.client.createAndPostOrder(
-        userOrder,
-        undefined,
-        req.orderType === 'MARKET' ? (OrderType.FOK as any) : (OrderType.GTC as any)
-      );
+          console.log(`[Sidecar] Executing MARKET BUY: $${actualCost.toFixed(2)} USD (est. ${shares} shares @ $${executionPrice})`);
+
+          const userMarketOrder: UserMarketOrderV2 = {
+            tokenID: tokenId,
+            amount: actualCost, // USD collateral amount (strictly 2 decimals)
+            price: executionPrice, // Max price / slippage cap (strictly 2 decimals)
+            side: Side.BUY,
+          };
+
+          response = await this.client.createAndPostMarketOrder(
+            userMarketOrder,
+            undefined,
+            OrderType.FOK
+          );
+        } else {
+          // Polymarket CLOB V2 Market Sell:
+          // 'amount' is the number of shares (contracts) to sell, rounded to 2 decimals.
+          shares = Math.max(0.01, Math.round((req.shares || 1) * 100) / 100);
+          actualCost = parseFloat((shares * executionPrice).toFixed(2));
+
+          console.log(`[Sidecar] Executing MARKET SELL: ${shares} shares @ $${executionPrice} (Total: $${actualCost})`);
+
+          const userMarketOrder: UserMarketOrderV2 = {
+            tokenID: tokenId,
+            amount: shares, // Shares to sell (strictly 2 decimals)
+            price: executionPrice, // Min price / slippage floor (strictly 2 decimals)
+            side: Side.SELL,
+          };
+
+          response = await this.client.createAndPostMarketOrder(
+            userMarketOrder,
+            undefined,
+            OrderType.FOK
+          );
+        }
+      } else {
+        // LIMIT Order (GTC)
+        if (side === 'BUY') {
+          const targetUsd = Math.max(1.00, amountUsd || 1.00);
+          shares = req.shares && req.shares > 0
+            ? Math.round(req.shares * 100) / 100
+            : Math.max(0.01, Math.round((targetUsd / executionPrice) * 100) / 100);
+          actualCost = parseFloat((shares * executionPrice).toFixed(2));
+        } else {
+          shares = Math.max(0.01, Math.round((req.shares || 1) * 100) / 100);
+          actualCost = parseFloat((shares * executionPrice).toFixed(2));
+        }
+
+        console.log(`[Sidecar] Executing LIMIT ${side}: ${shares} shares @ $${executionPrice} (Total: $${actualCost})`);
+
+        const userOrder: UserOrderV2 = {
+          tokenID: tokenId,
+          price: executionPrice,
+          size: shares,
+          side: side === 'BUY' ? Side.BUY : Side.SELL,
+        };
+
+        response = await this.client.createAndPostOrder(
+          userOrder,
+          undefined,
+          OrderType.GTC
+        );
+      }
 
       console.log('[Sidecar] CLOB Order Response:', response);
 
+      // Strict validation: NEVER return success if rejected or errored
+      if (!response || response.error || response.errorMsg || response.success === false || (response.status && response.status >= 400)) {
+        const errorDetail = response?.errorMsg || response?.error || `HTTP ${response?.status || 'Error'}`;
+        return {
+          success: false,
+          message: `Order ditolak Polymarket: ${typeof errorDetail === 'object' ? JSON.stringify(errorDetail) : errorDetail}`,
+          rawResponse: response,
+        };
+      }
+
+      const orderId = response.orderID || response.id || response.orderId;
+      if (!orderId && !response.transactionsHashes?.length && !response.tradeIDs?.length) {
+        return {
+          success: false,
+          message: `Order tidak terisi (harga tidak match atau dibatalkan oleh CLOB).`,
+          rawResponse: response,
+        };
+      }
+
+      const potentialPayout = side === 'BUY' ? parseFloat((shares * 1.00).toFixed(2)) : 0;
+      const potentialProfit = side === 'BUY' ? parseFloat(Math.max(0, potentialPayout - actualCost).toFixed(2)) : 0;
+
       return {
         success: true,
-        orderId: response?.orderID || response?.id || `ord-${Date.now()}`,
+        orderId: orderId || `ord-${Date.now()}`,
         shares,
         price: executionPrice,
         totalCost: actualCost,
         potentialProfit,
-        message: `Order ${side} ${req.outcome} berhasil dikirim! (${shares} kontrak @ ${(executionPrice * 100).toFixed(1)}¢)`,
+        message: `Order ${side} ${req.outcome} berhasil dipasang! (${shares} kontrak @ ${(executionPrice * 100).toFixed(1)}¢)`,
         rawResponse: response,
       };
     } catch (err: any) {
@@ -350,6 +424,25 @@ class ClobServiceManager {
       console.warn('[CLOB] Error resolving proxy wallet:', e);
     }
     return null;
+  }
+
+  public async getUserPositions(): Promise<any[]> {
+    if (!this.currentCreds) return [];
+    const funder = this.currentCreds.funderAddress || (this.signer ? this.signer.address : null);
+    if (!funder) return [];
+
+    try {
+      const res = await fetch(`https://data-api.polymarket.com/positions?user=${funder.toLowerCase()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn('[Sidecar] Error fetching positions:', err);
+    }
+    return [];
   }
 }
 
