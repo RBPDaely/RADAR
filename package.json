@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "bash start.sh",
     "dev": "vite",
     "sidecar": "bun run server/index.ts",
     "build": "tsc -b && vite build",
