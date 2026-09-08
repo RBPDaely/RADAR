@@ -46,7 +46,10 @@ const server = Bun.serve({
       if (url.pathname === '/api/credentials' && req.method === 'POST') {
         const body = (await req.json()) as RadarCredentials;
         if (!body.signerPrivateKey) {
-          return jsonResponse({ success: false, message: 'Signer Private Key diperlukan.' }, 400);
+          return jsonResponse({
+            success: false,
+            message: 'Signer Private Key diperlukan untuk menandatangani EIP-712 order. Ekspor dari https://reveal.magic.link/polymarket dengan email akun Anda.',
+          }, 400);
         }
 
         saveCredentials(body);
