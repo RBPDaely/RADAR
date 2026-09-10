@@ -30,6 +30,9 @@ export function App() {
     upPrice,
     downPrice,
     currentWindowTs,
+    selectedWindowTs,
+    setSelectedWindowTs,
+    upcomingPeriods,
     settlement,
     activeCandles,
     twapLineData,
@@ -51,7 +54,7 @@ export function App() {
   // Credential Settings Modal
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
-  const slug = getPolymarketSlug(asset, currentWindowTs);
+  const slug = getPolymarketSlug(asset, selectedWindowTs || currentWindowTs);
   const activeLastPrice = chartMode === 'SPOT' ? spotPrice : upPrice;
   const isDark = theme === 'dark';
 
@@ -201,6 +204,10 @@ export function App() {
                   downTokenId={downTokenId}
                   theme={theme}
                   onOpenSettings={() => setIsSettingsOpen(true)}
+                  settlement={settlement}
+                  selectedWindowTs={selectedWindowTs}
+                  upcomingPeriods={upcomingPeriods}
+                  onSelectPeriod={setSelectedWindowTs}
                 />
               )}
               {mobileTab === 'book' && <div className="h-[480px]"><ClobOrderBook orderBook={orderBook} theme={theme} /></div>}
@@ -227,7 +234,7 @@ export function App() {
                 theme={theme}
               />
 
-              {/* 2. Instant Order Execution Panel with Profit Calculator */}
+              {/* 2. Instant Order Execution Panel with Relocated Odds & Decision Tree */}
               <OrderExecutionPanel
                 asset={asset}
                 upPrice={upPrice}
@@ -236,6 +243,10 @@ export function App() {
                 downTokenId={downTokenId}
                 theme={theme}
                 onOpenSettings={() => setIsSettingsOpen(true)}
+                settlement={settlement}
+                selectedWindowTs={selectedWindowTs}
+                upcomingPeriods={upcomingPeriods}
+                onSelectPeriod={setSelectedWindowTs}
               />
 
               {/* 3. Tabbed Order Book & Live Trades Stream */}
