@@ -42,7 +42,7 @@ export const TwapAnalyticsCard: React.FC<TwapAnalyticsCardProps> = ({
   return (
     <div
       className={`border rounded-xl px-3 py-2 flex flex-col font-mono text-xs shadow-md select-none transition-colors flex-shrink-0 ${
-        isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-[#dbe0e7] text-slate-800'
+        isDark ? 'bg-[#181d28] border-[#2a2e39]' : 'bg-white border-slate-200 text-slate-800'
       }`}
     >
       {/* Header bar */}
@@ -50,7 +50,7 @@ export const TwapAnalyticsCard: React.FC<TwapAnalyticsCardProps> = ({
         <div className={`flex items-center space-x-1.5 font-black text-[11px] uppercase ${isDark ? 'text-[#d1d4dc]' : 'text-slate-800'}`}>
           <ShieldCheck className="w-3.5 h-3.5 text-[#a855f7]" />
           <span>CHAINLINK TWAP BENCHMARK</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#a855f7]/20 border border-[#a855f7]/40 text-[#c084fc] font-bold">
+          <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#a855f7]/20 border border-[#a855f7]/40 text-[#a855f7] dark:text-[#c084fc] font-bold">
             ORACLE 60S
           </span>
         </div>
@@ -61,7 +61,7 @@ export const TwapAnalyticsCard: React.FC<TwapAnalyticsCardProps> = ({
             href={`https://polymarket.com/id/event/${slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center space-x-0.5 text-[#f0b90b] hover:underline font-bold"
+            className="flex items-center space-x-0.5 text-amber-600 dark:text-[#f0b90b] hover:underline font-bold"
           >
             <span>Market</span>
             <ExternalLink className="w-2.5 h-2.5" />
@@ -72,31 +72,31 @@ export const TwapAnalyticsCard: React.FC<TwapAnalyticsCardProps> = ({
       {/* 3 Horizontal Benchmark Columns */}
       <div className="grid grid-cols-3 gap-2 text-center">
         {/* Strike */}
-        <div className={`p-1 rounded-lg border ${isDark ? 'bg-[#1e222d]' : 'bg-slate-50'}`}>
+        <div className={`p-1 rounded-lg border ${isDark ? 'bg-[#1e222d] border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
           <span className="text-[9px] text-[#787b86] font-bold uppercase block">STRIKE (00:00)</span>
-          <span className="text-xs sm:text-sm font-black text-[#f0b90b] block">
+          <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-[#f0b90b] block">
             ${strikePrice > 0 ? strikePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---.--'}
           </span>
         </div>
 
         {/* Running TWAP */}
-        <div className={`p-1 rounded-lg border ${isDark ? 'bg-[#1e222d]' : 'bg-slate-50'}`}>
+        <div className={`p-1 rounded-lg border ${isDark ? 'bg-[#1e222d] border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
           <span className="text-[9px] text-[#787b86] font-bold uppercase block">RUNNING TWAP</span>
-          <span className="text-xs sm:text-sm font-black text-[#c084fc] block">
+          <span className="text-xs sm:text-sm font-black text-purple-700 dark:text-[#c084fc] block">
             ${runningTwap > 0 ? runningTwap.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---.--'}
           </span>
-          <span className={`text-[8px] font-black ${isUpWinning ? 'text-[#089981]' : 'text-[#f23645]'}`}>
+          <span className={`text-[8px] font-black ${isUpWinning ? 'text-emerald-600 dark:text-[#089981]' : 'text-rose-600 dark:text-[#f23645]'}`}>
             {twapDelta >= 0 ? '+' : ''}${twapDelta.toFixed(2)} ({twapDeltaPct.toFixed(1)}%)
           </span>
         </div>
 
         {/* Target Flip */}
-        <div className={`p-1 rounded-lg border ${isDark ? 'bg-[#1e222d]' : 'bg-slate-50'}`}>
+        <div className={`p-1 rounded-lg border ${isDark ? 'bg-[#1e222d] border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex items-center justify-center space-x-1 text-[9px] text-[#787b86] font-bold uppercase">
-            <Target className="w-2.5 h-2.5 text-[#f0b90b]" />
+            <Target className="w-2.5 h-2.5 text-amber-600 dark:text-[#f0b90b]" />
             <span>TARGET BALIK:</span>
           </div>
-          <span className="text-xs sm:text-sm font-black text-[#f0b90b] block">
+          <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-[#f0b90b] block">
             ${requiredPriceToFlip > 0 ? requiredPriceToFlip.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---'}
           </span>
           <span className="text-[8px] text-[#787b86] block">Sisa {secondsLeft}s</span>
