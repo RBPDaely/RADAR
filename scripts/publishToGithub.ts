@@ -55,49 +55,76 @@ function getAllFiles(dir: string, baseDir: string = dir): string[] {
 }
 
 async function main() {
-  console.log(`[1/4] Memverifikasi token GitHub untuk pengguna ${GITHUB_USERNAME}...`);
+  console.log(`[1/4] Memverifikasi token GitHub...`);
   const userRes = await fetch('https://api.github.com/user', { headers });
   if (!userRes.ok) {
-    console.error('[Error] Token GitHub tidak valid.');
+    console.error('[Error] Token GitHub tidak valid atau tidak memiliki akses.');
     process.exit(1);
   }
   const userData = await userRes.json();
-  console.log(`[OK] Terotentikasi sebagai: ${userData.login}`);
+  const owner = userData.login;
+  console.log(`[OK] Terotentikasi sebagai: ${owner}`);
+
+  // Check target repo
+  let targetRepo = REPO_NAME;
+  let repoRes = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}`, { headers });
+  if (!repoRes.ok) {
+    const altRes = await fetch(`https://api.github.com/repos/${owner}/polymarket-feed-pro`, { headers });
+    if (altRes.ok) {
+      targetRepo = 'polymarket-feed-pro';
+    } else {
+      console.log(`Membuat repositori baru ${owner}/${targetRepo}...`);
+      const createRes = await fetch('https://api.github.com/user/repos', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: targetRepo,
+          description: 'RADAR - Polymarket 5M UP/DOWN Trading Terminal Pro',
+          private: true,
+          auto_init: false,
+        }),
+      });
+      if (!createRes.ok) {
+        console.warn('Gagal membuat repo otomatis, mencoba melanjutkan...');
+      }
+    }
+  }
+  console.log(`[OK] Repositori target: ${owner}/${targetRepo}`);
 
   const rootDir = process.cwd();
   const files = getAllFiles(rootDir);
-  console.log(`[2/4] Menyiapkan ${files.length} berkas untuk diunggah ke ${GITHUB_USERNAME}/${REPO_NAME}...`);
+  console.log(`[2/4] Menyiapkan ${files.length} berkas untuk diunggah ke ${owner}/${targetRepo}...`);
 
   // Ensure initial commit exists by writing README.md via Contents API first
   const readmeContent = fs.readFileSync(path.join(rootDir, 'README.md')).toString('base64');
-  console.log(`Menginisialisasi branch main...`);
+  console.log(`Menginisialisasi / menyinkronkan branch main...`);
   
   // Check if README.md exists to get SHA if already present
-  const checkReadme = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/README.md`, { headers });
+  const checkReadme = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}/contents/README.md`, { headers });
   let readmeSha: string | undefined = undefined;
   if (checkReadme.ok) {
     const rmData = await checkReadme.json();
     readmeSha = rmData.sha;
   }
 
-  const initRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/README.md`, {
+  const initRes = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}/contents/README.md`, {
     method: 'PUT',
     headers,
     body: JSON.stringify({
-      message: 'chore: initialize repository with README',
+      message: 'chore: update README for RADAR Pro Terminal',
       content: readmeContent,
       sha: readmeSha,
     }),
   });
 
   if (!initRes.ok) {
-    console.error('[Error] Gagal inisialisasi:', await initRes.json());
-    process.exit(1);
+    console.error('[Error] Gagal sinkronisasi README:', await initRes.json());
+  } else {
+    console.log(`[OK] README berhasil disinkronkan.`);
   }
-  console.log(`[OK] Repositori berhasil diinisialisasi.`);
 
   // Upload all other files via Contents API
-  console.log(`[3/4] Mengunggah berkas sumber ke repositori...`);
+  console.log(`[3/4] Mengunggah dan memperbarui berkas sumber ke repositori...`);
   for (const relPath of files) {
     if (relPath === 'README.md') continue;
 
@@ -106,18 +133,18 @@ async function main() {
     const encodedPath = relPath.split(path.sep).map(encodeURIComponent).join('/');
 
     // Check if file exists
-    const checkFile = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${encodedPath}`, { headers });
+    const checkFile = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}/contents/${encodedPath}`, { headers });
     let fileSha: string | undefined = undefined;
     if (checkFile.ok) {
       const fData = await checkFile.json();
       fileSha = fData.sha;
     }
 
-    const uploadRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${encodedPath}`, {
+    const uploadRes = await fetch(`https://api.github.com/repos/${owner}/${targetRepo}/contents/${encodedPath}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
-        message: `feat: add ${relPath}`,
+        message: `feat: update ${relPath} (RADAR Pro Features)`,
         content,
         sha: fileSha,
       }),
@@ -126,13 +153,14 @@ async function main() {
     if (uploadRes.ok) {
       console.log(` + ${relPath}`);
     } else {
-      console.warn(` - Gagal unggah ${relPath}:`, (await uploadRes.json()).message);
+      const err = await uploadRes.json();
+      console.warn(` - Gagal unggah ${relPath}:`, err.message || err);
     }
   }
 
   console.log(`\n======================================================`);
   console.log(`[4/4] PUBLIKASI SELESAI & TERVERIFIKASI`);
-  console.log(`URL Repositori: https://github.com/${GITHUB_USERNAME}/${REPO_NAME}`);
+  console.log(`URL Repositori: https://github.com/${owner}/${targetRepo}`);
   console.log(`======================================================\n`);
 }
 
