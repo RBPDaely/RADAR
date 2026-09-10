@@ -62,7 +62,7 @@ export function App() {
   return (
     <div
       className={`min-h-screen lg:h-screen lg:max-h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-[#f0b90b] selection:text-black transition-colors ${
-        isDark ? 'bg-[#0e1118] text-[#d1d4dc]' : 'bg-[#f4f6f9] text-[#191b22]'
+        isDark ? 'bg-[#131722] text-[#d1d4dc]' : 'bg-[#f0f3f6] text-[#131722]'
       }`}
     >
       {/* Top Pro Sticky Header */}
@@ -88,7 +88,7 @@ export function App() {
         {/* Mobile Tab Switcher (Visible only on mobile/tablet) */}
         <div
           className={`lg:hidden flex items-center p-1 rounded-xl border text-xs font-mono select-none mb-2 ${
-            isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-[#dbe0e7] shadow-sm'
+            isDark ? 'bg-[#181d28] border-[#2a2e39]' : 'bg-white border-slate-200 shadow-sm'
           }`}
         >
           <button
@@ -273,11 +273,13 @@ export function App() {
               />
 
               {/* 2. Tabbed Order Book & Live Trades Stream */}
-              <div className="flex-1 min-h-0 flex flex-col border rounded-xl overflow-hidden shadow-md">
+              <div className={`flex-1 min-h-0 flex flex-col border rounded-xl overflow-hidden shadow-md ${
+                isDark ? 'bg-[#181d28] border-[#2a2e39]' : 'bg-white border-slate-200'
+              }`}>
                 {/* Book vs Tape Tab Switcher */}
                 <div
                   className={`flex items-center px-2 py-1 border-b text-[10px] font-mono font-bold select-none flex-shrink-0 ${
-                    isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-slate-100 border-slate-200'
+                    isDark ? 'bg-[#1e222d] border-[#2a2e39]' : 'bg-slate-100 border-slate-200'
                   }`}
                 >
                   <button
