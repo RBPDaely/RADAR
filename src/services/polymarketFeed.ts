@@ -1,4 +1,4 @@
-import { CryptoAsset, PolymarketEvent, OrderBookState, TradeItem, OHLCData } from '../types/market';
+import { CryptoAsset, PolymarketEvent, OrderBookState, TradeItem, OHLCData, MarketPeriodInfo } from '../types/market';
 
 export const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 export const CLOB_API_BASE = 'https://clob.polymarket.com';
@@ -54,6 +54,72 @@ export async function fetchEventBySlug(slug: string): Promise<PolymarketEvent | 
   } catch (err) {
     return null;
   }
+}
+
+/**
+ * Fetches upcoming periods (active round + next rounds like +5m, +10m, +15m)
+ * with actual Polymarket market details and tokens.
+ */
+export async function fetchUpcomingPeriods(
+  asset: CryptoAsset,
+  currentWindowTs: number,
+  count: number = 4
+): Promise<MarketPeriodInfo[]> {
+  const periods: MarketPeriodInfo[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const wTs = currentWindowTs + (i * 300);
+    const slug = getPolymarketSlug(asset, wTs);
+    const timeRange = formatWindowTimeRange(wTs);
+    const isCurrent = i === 0;
+
+    periods.push({
+      windowTs: wTs,
+      label: isCurrent ? `AKTIF (${timeRange})` : `+${i * 5}m (${timeRange})`,
+      isCurrent,
+      event: null,
+      market: null,
+      upTokenId: '',
+      downTokenId: '',
+      upPrice: 0.50,
+      downPrice: 0.50,
+      slug,
+    });
+  }
+
+  await Promise.all(
+    periods.map(async (p) => {
+      try {
+        const evt = await fetchEventBySlug(p.slug);
+        if (evt && evt.markets && evt.markets.length > 0) {
+          p.event = evt;
+          const m = evt.markets[0];
+          p.market = m;
+          try {
+            const tokens = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds;
+            if (Array.isArray(tokens) && tokens.length >= 2) {
+              p.upTokenId = tokens[0];
+              p.downTokenId = tokens[1];
+            }
+          } catch (e) {}
+
+          if (m.outcomePrices) {
+            try {
+              const prices = typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices;
+              if (Array.isArray(prices) && prices.length >= 2) {
+                const uP = parseFloat(prices[0]);
+                const dP = parseFloat(prices[1]);
+                if (!isNaN(uP) && uP > 0 && uP < 1) p.upPrice = uP;
+                if (!isNaN(dP) && dP > 0 && dP < 1) p.downPrice = dP;
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+    })
+  );
+
+  return periods;
 }
 
 /**
@@ -370,21 +436,43 @@ export class PolymarketClobWsManager {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          const item = Array.isArray(data) ? data[0] : data;
-          if (!item) return;
+          const items = Array.isArray(data) ? data : [data];
 
-          if (item.asset_id === this.upTokenId) {
-            if (item.bids || item.asks) {
-              this.onBookCallback?.(item.bids || [], item.asks || []);
-            }
+          for (const item of items) {
+            if (!item) continue;
+            const assetId = item.asset_id || item.market || item.token_id;
 
-            if (item.price_changes) {
-              for (const pc of item.price_changes) {
-                const price = parseFloat(pc.price);
-                const size = parseFloat(pc.size || '10');
-                const side = pc.side === 'BUY' ? 'BUY' : 'SELL';
+            if (assetId === this.upTokenId || (!assetId && (item.bids || item.asks))) {
+              if (item.bids || item.asks) {
+                const bids = item.bids || [];
+                const asks = item.asks || [];
+                this.onBookCallback?.(bids, asks);
+
+                const bestBid = parseFloat(bids[0]?.price);
+                const bestAsk = parseFloat(asks[0]?.price);
+                if (!isNaN(bestBid) && !isNaN(bestAsk) && bestBid > 0 && bestAsk < 1) {
+                  const mid = (bestBid + bestAsk) / 2;
+                  this.onTickCallback?.(this.upTokenId, mid, 10, 'BUY');
+                }
+              }
+
+              if (item.event_type === 'last_trade_price' || (item.price && item.size)) {
+                const price = parseFloat(item.price);
+                const size = parseFloat(item.size || '10');
+                const side = item.side === 'SELL' ? 'SELL' : 'BUY';
                 if (!isNaN(price) && price > 0 && price < 1) {
-                  this.onTickCallback?.(item.asset_id, price, size, side);
+                  this.onTickCallback?.(this.upTokenId, price, size, side);
+                }
+              }
+
+              if (item.price_changes) {
+                for (const pc of item.price_changes) {
+                  const price = parseFloat(pc.price);
+                  const size = parseFloat(pc.size || '10');
+                  const side = pc.side === 'BUY' ? 'BUY' : 'SELL';
+                  if (!isNaN(price) && price > 0 && price < 1) {
+                    this.onTickCallback?.(this.upTokenId, price, size, side);
+                  }
                 }
               }
             }
