@@ -93,22 +93,36 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
   const [showStrike, setShowStrike] = useState<boolean>(true);
   const [showVolume, setShowVolume] = useState<boolean>(true);
 
-  // Manual Volume Scaling State (5% to 60% of chart height)
+  // Manual Volume Scaling State (5% to 70% of chart height)
   const [volScalePct, setVolScalePct] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('chart_vol_scale');
-      return saved ? parseInt(saved, 10) : 20;
+      return saved ? parseInt(saved, 10) : 25;
     } catch (e) {
-      return 20;
+      return 25;
     }
   });
 
   const updateVolScale = (newScale: number) => {
-    const clamped = Math.max(5, Math.min(60, newScale));
+    const clamped = Math.max(5, Math.min(70, newScale));
     setVolScalePct(clamped);
     try {
       localStorage.setItem('chart_vol_scale', clamped.toString());
     } catch (e) {}
+  };
+
+  const zoomHorizontal = (direction: 'in' | 'out' | 'fit') => {
+    if (!chartRef.current) return;
+    const timeScale = chartRef.current.timeScale();
+    if (direction === 'fit') {
+      timeScale.fitContent();
+    } else if (direction === 'in') {
+      const current = timeScale.options().barSpacing || 8;
+      timeScale.applyOptions({ barSpacing: Math.min(45, current * 1.35) });
+    } else {
+      const current = timeScale.options().barSpacing || 8;
+      timeScale.applyOptions({ barSpacing: Math.max(2, current * 0.7) });
+    }
   };
 
   // Real-time tick change flash tracking for UP/DOWN values
@@ -761,6 +775,36 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
             )}
           </div>
 
+          {/* Horizontal Zoom Controls (Samping) */}
+          <div
+            className={`hidden sm:flex items-center space-x-0.5 px-1 py-0.5 rounded border text-[10px] font-mono ${
+              isDark ? 'bg-[#1e222d] border-[#2a2e39]' : 'bg-slate-100 border-slate-300'
+            }`}
+            title="Zoom Horizontal Lilin & Volume"
+          >
+            <button
+              onClick={() => zoomHorizontal('out')}
+              className="px-1 text-[#787b86] hover:text-[#f0b90b] font-black hover:bg-[#2a2e39] rounded transition-colors"
+              title="Rapatkan Bar (Zoom Out)"
+            >
+              -
+            </button>
+            <button
+              onClick={() => zoomHorizontal('fit')}
+              className="px-1 text-[#787b86] hover:text-white font-bold hover:bg-[#2a2e39] rounded transition-colors text-[9px]"
+              title="Reset Tampilan / Fit"
+            >
+              FIT
+            </button>
+            <button
+              onClick={() => zoomHorizontal('in')}
+              className="px-1 text-[#787b86] hover:text-[#f0b90b] font-black hover:bg-[#2a2e39] rounded transition-colors"
+              title="Lebarkan Bar (Zoom In)"
+            >
+              +
+            </button>
+          </div>
+
           {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
@@ -773,127 +817,6 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
           >
             {isFullscreen ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
           </button>
-        </div>
-      </div>
-
-      {/* 2. FLOATING HUD DI DALAM CHART: KOTAK UP & DOWN */}
-      <div className="w-full px-2 pt-1.5 pb-1 flex justify-center z-20 flex-shrink-0">
-        <div
-          className={`w-full max-w-4xl rounded-xl border p-1.5 shadow-xl backdrop-blur-md transition-all ${
-            isDark ? 'bg-[#131722]/90 border-[#2a2e39]' : 'bg-white/95 border-[#dbe0e7]'
-          }`}
-        >
-          <div className="grid grid-cols-2 gap-1.5 items-stretch">
-            {/* UP CARD */}
-            <div
-              className={`relative overflow-hidden rounded-lg px-2.5 py-1.5 border transition-all duration-300 flex items-center justify-between ${
-                isUpWinning
-                  ? isDark
-                    ? 'bg-[radial-gradient(ellipse_at_right,_var(--tw-gradient-stops))] from-[#089981]/30 via-[#0d2b20] to-[#131722] border-[#089981] shadow-[0_0_20px_rgba(8,153,129,0.4)] ring-1 ring-[#089981]'
-                    : 'bg-emerald-50 border-[#089981] shadow-md ring-1 ring-[#089981]'
-                  : isDark
-                  ? 'bg-[#1e222d]/60 border-[#2a2e39]'
-                  : 'bg-white border-slate-200'
-              } ${upFlash ? 'scale-[1.01] brightness-125' : ''}`}
-            >
-              <div className="flex flex-col justify-center relative z-10">
-                <div className="flex items-center space-x-1">
-                  <div className="p-0.5 rounded bg-[#089981]/20 text-[#089981]">
-                    <ArrowUpRight className="w-3 h-3 font-black" />
-                  </div>
-                  <span className="text-[10px] font-mono font-black uppercase text-[#089981]">
-                    UP (NAIK)
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1.5 text-[9px] font-mono text-[#787b86]">
-                  <span>ROI:</span>
-                  <span className="font-black text-[#089981]">+{upRoi.toFixed(0)}%</span>
-                  <span className="hidden sm:inline">(${validUpPrice.toFixed(3)})</span>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-1.5 relative z-10 pl-2">
-                {isUpWinning && (
-                  <span className="hidden sm:flex items-center space-x-0.5 px-1.5 py-0.2 rounded-full text-[8px] font-mono font-black bg-[#089981] text-slate-950 uppercase tracking-wider animate-pulse shadow-[0_0_8px_#089981]">
-                    <TrendingUp className="w-2.5 h-2.5" />
-                    <span>LEAD</span>
-                  </span>
-                )}
-                <div
-                  className={`text-2xl sm:text-3xl font-mono font-black tracking-tight text-[#089981] transition-all duration-200 ${
-                    isUpWinning
-                      ? 'drop-shadow-[0_0_15px_rgba(8,153,129,0.9)]'
-                      : 'drop-shadow-[0_0_6px_rgba(8,153,129,0.4)]'
-                  } ${upFlash === 'up' ? 'text-[#00ff88] drop-shadow-[0_0_25px_#00ff88]' : ''}`}
-                >
-                  {upCents}¢
-                </div>
-              </div>
-            </div>
-
-            {/* DOWN CARD */}
-            <div
-              className={`relative overflow-hidden rounded-lg px-2.5 py-1.5 border transition-all duration-300 flex items-center justify-between ${
-                !isUpWinning
-                  ? isDark
-                    ? 'bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-[#f23645]/30 via-[#2e1219] to-[#131722] border-[#f23645] shadow-[0_0_20px_rgba(242,54,69,0.4)] ring-1 ring-[#f23645]'
-                    : 'bg-rose-50 border-[#f23645] shadow-md ring-1 ring-[#f23645]'
-                  : isDark
-                  ? 'bg-[#1e222d]/60 border-[#2a2e39]'
-                  : 'bg-white border-slate-200'
-              } ${downFlash ? 'scale-[1.01] brightness-125' : ''}`}
-            >
-              <div className="flex items-center space-x-1.5 relative z-10 pr-2">
-                <div
-                  className={`text-2xl sm:text-3xl font-mono font-black tracking-tight text-[#f23645] transition-all duration-200 ${
-                    !isUpWinning
-                      ? 'drop-shadow-[0_0_15px_rgba(242,54,69,0.9)]'
-                      : 'drop-shadow-[0_0_6px_rgba(242,54,69,0.4)]'
-                  } ${downFlash === 'up' ? 'text-[#ff3b69] drop-shadow-[0_0_25px_#ff3b69]' : ''}`}
-                >
-                  {downCents}¢
-                </div>
-                {!isUpWinning && (
-                  <span className="hidden sm:flex items-center space-x-0.5 px-1.5 py-0.2 rounded-full text-[8px] font-mono font-black bg-[#f23645] text-white uppercase tracking-wider animate-pulse shadow-[0_0_8px_#f23645]">
-                    <TrendingDown className="w-2.5 h-2.5" />
-                    <span>LEAD</span>
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col justify-center items-end relative z-10">
-                <div className="flex items-center space-x-1">
-                  <span className="text-[10px] font-mono font-black uppercase text-[#f23645]">
-                    DOWN (TURUN)
-                  </span>
-                  <div className="p-0.5 rounded bg-[#f23645]/20 text-[#f23645]">
-                    <ArrowDownRight className="w-3 h-3 font-black" />
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1.5 text-[9px] font-mono text-[#787b86]">
-                  <span className="hidden sm:inline">(${validDownPrice.toFixed(3)})</span>
-                  <span>ROI:</span>
-                  <span className="font-black text-[#f23645]">+{downRoi.toFixed(0)}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Energy Duel Bar */}
-          <div className="relative w-full h-1 rounded-full overflow-hidden flex bg-[#1e222d] mt-1 shadow-inner">
-            <div
-              className="h-full bg-gradient-to-r from-[#089981] to-[#00ff88] transition-all duration-300 shadow-[0_0_6px_#089981]"
-              style={{ width: `${upPct}%` }}
-            />
-            <div
-              className="h-full bg-gradient-to-l from-[#f23645] to-[#ff3b69] transition-all duration-300 shadow-[0_0_6px_#f23645]"
-              style={{ width: `${downPct}%` }}
-            />
-            <div
-              className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_6px_#ffffff] transform -translate-x-1/2 transition-all duration-300"
-              style={{ left: `${upPct}%` }}
-            />
-          </div>
         </div>
       </div>
 
