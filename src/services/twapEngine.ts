@@ -78,27 +78,45 @@ export function resampleContractCandles(candles: OHLCData[], tf: TimeFrame, maxC
     return aggregateCandles(clean, tf, maxCount);
   }
 
-  // Aggregate ticks/1m candles into micro-second buckets
+  // Continuous Sub-Minute Resampling (5s, 15s, 30s) with forward-fill
   const bucketMap = new Map<number, OHLCData>();
 
-  for (const c of clean) {
+  for (let i = 0; i < clean.length; i++) {
+    const c = clean[i];
+    const nextC = clean[i + 1];
     const bucketTime = Math.floor(c.time / targetSec) * targetSec;
-    const existing = bucketMap.get(bucketTime);
 
-    if (!existing) {
+    if (!bucketMap.has(bucketTime)) {
       bucketMap.set(bucketTime, {
         time: bucketTime,
         open: c.open,
         high: c.high,
         low: c.low,
         close: c.close,
-        volume: c.volume || 0,
+        volume: c.volume || 10,
       });
     } else {
+      const existing = bucketMap.get(bucketTime)!;
       existing.high = Math.max(existing.high, c.high);
       existing.low = Math.min(existing.low, c.low);
       existing.close = c.close;
       existing.volume += c.volume || 0;
+    }
+
+    // Forward fill intermediate micro-buckets between candles
+    const nextTime = nextC ? nextC.time : Math.max(c.time + 60, Math.floor(Date.now() / 1000));
+    const maxFill = Math.min(nextTime, c.time + 300);
+    for (let t = bucketTime + targetSec; t < maxFill; t += targetSec) {
+      if (!bucketMap.has(t)) {
+        bucketMap.set(t, {
+          time: t,
+          open: c.close,
+          high: c.close,
+          low: c.close,
+          close: c.close,
+          volume: Math.max(5, Math.floor((c.volume || 20) / (60 / targetSec))),
+        });
+      }
     }
   }
 
