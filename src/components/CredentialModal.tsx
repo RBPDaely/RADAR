@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ThemeMode } from '../types/market';
+import { getSidecarUrl } from '../config';
 import { ethers } from 'ethers';
 import {
   Key,
@@ -115,7 +116,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
     try {
       // 1. Try sidecar resolution
       try {
-        const res = await fetch(`http://127.0.0.1:3001/api/credentials/resolve-funder?signerAddress=${addr}`);
+        const res = await fetch(`${getSidecarUrl()}/api/credentials/resolve-funder?signerAddress=${addr}`);
         if (res.ok) {
           const data = await res.json();
           if (data.proxyWallet && data.isDetected) {
@@ -128,31 +129,34 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
             return;
           }
         }
-      } catch {}
+      } catch (e) {
+        // Fallback to direct Polymarket API fetch if sidecar is unavailable
+      }
 
-      // 2. Direct public Polymarket API query
-      const directRes = await fetch(`https://polymarket.com/api/profile/userData?address=${addr.toLowerCase()}`);
-      if (directRes.ok) {
-        const d = await directRes.json();
-        if (d && d.proxyWallet && ethers.isAddress(d.proxyWallet)) {
-          setFunderAddress(d.proxyWallet);
+      // 2. Fallback direct Polymarket API query
+      const url = `https://polymarket.com/api/profile/userData?address=${addr.toLowerCase()}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const safeAddr = data.proxyWallet || data.address;
+        if (safeAddr) {
+          setFunderAddress(safeAddr);
           setFeedback({
             type: 'success',
-            message: `Funder Address (Proxy Safe) terdeteksi dari profil Polymarket: ${d.proxyWallet.slice(0, 10)}...${d.proxyWallet.slice(-6)}`,
+            message: `Funder Address (Proxy Safe) berhasil terdeteksi: ${safeAddr.slice(0, 10)}...${safeAddr.slice(-6)}`,
           });
-          setIsResolvingFunder(false);
           return;
         }
       }
-
-      // 3. Fallback: if no proxy, use signer address
-      setFunderAddress(addr);
       setFeedback({
-        type: 'success',
-        message: `Funder Address menggunakan alamat signer: ${addr.slice(0, 10)}...${addr.slice(-6)}`,
+        type: 'error',
+        message: 'Tidak dapat menemukan Proxy Safe untuk Signer ini. Silakan salin Funder Address manual dari profil Polymarket Anda.',
       });
     } catch (err: any) {
-      setFeedback({ type: 'error', message: `Gagal deteksi otomatis: ${err.message}` });
+      setFeedback({
+        type: 'error',
+        message: `Gagal deteksi otomatis: ${err.message}`,
+      });
     } finally {
       setIsResolvingFunder(false);
     }
@@ -160,7 +164,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
 
   async function fetchStatus() {
     try {
-      const res = await fetch('http://127.0.0.1:3001/api/credentials/status');
+      const res = await fetch(`${getSidecarUrl()}/api/credentials/status`);
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
@@ -192,7 +196,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
     setFeedback(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:3001/api/credentials', {
+      const res = await fetch(`${getSidecarUrl()}/api/credentials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -226,7 +230,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:3001/api/credentials', { method: 'DELETE' });
+      const res = await fetch(`${getSidecarUrl()}/api/credentials`, { method: 'DELETE' });
       if (res.ok) {
         setFunderAddress('');
         setSignerPrivateKey('');
