@@ -8,14 +8,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  DollarSign,
   ArrowDownRight,
   ArrowUpRight,
   Wallet,
   X,
-  Plus,
   CornerDownRight,
-  Clock,
 } from 'lucide-react';
 
 interface OrderExecutionPanelProps {
@@ -41,9 +38,6 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
   theme = 'dark',
   onOpenSettings,
   settlement,
-  selectedWindowTs,
-  upcomingPeriods = [],
-  onSelectPeriod,
 }) => {
   const isDark = theme === 'dark';
   const [hoveredMode, setHoveredMode] = useState<'BUY' | 'SELL' | null>(null);
