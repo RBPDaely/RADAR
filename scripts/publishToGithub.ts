@@ -21,6 +21,7 @@ const headers = {
 const IGNORED_PATTERNS = [
   'node_modules',
   'dist',
+  'dist-ssr',
   '.git',
   '.radar_credentials.json',
   '.env',
@@ -30,7 +31,15 @@ const IGNORED_PATTERNS = [
 
 function shouldIgnore(relPath: string): boolean {
   const parts = relPath.split(path.sep);
-  return parts.some((p) => IGNORED_PATTERNS.includes(p) || p.startsWith('.env') || p.endsWith('.log'));
+  return parts.some((p) =>
+    IGNORED_PATTERNS.includes(p) ||
+    p.startsWith('.env') ||
+    p.startsWith('.radar_credentials') ||
+    p.endsWith('.key') ||
+    p.endsWith('.pem') ||
+    p.endsWith('.secret') ||
+    p.endsWith('.log')
+  );
 }
 
 function getAllFiles(dir: string, baseDir: string = dir): string[] {
