@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CryptoAsset, RoundSettlementState, LatencyStats, ThemeMode } from '../types/market';
 import { Clock, Zap, Sun, Moon, TrendingUp, TrendingDown, Key, Wallet } from 'lucide-react';
 import { formatWindowTimeRange } from '../services/polymarketFeed';
+import { getSidecarUrl } from '../config';
 
 interface ProHeaderProps {
   asset: CryptoAsset;
@@ -40,7 +41,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
     let active = true;
     async function checkBalance() {
       try {
-        const res = await fetch('http://127.0.0.1:3001/api/credentials/status');
+        const res = await fetch(`${getSidecarUrl()}/api/credentials/status`);
         if (res.ok) {
           const data = await res.json();
           if (active && data.usdcBalance !== undefined) {
