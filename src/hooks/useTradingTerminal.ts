@@ -12,6 +12,7 @@ import {
   PolymarketMarket,
   RoundSettlementState,
   LatencyStats,
+  MarketPeriodInfo,
 } from '../types/market';
 import {
   BinanceStreamManager,
@@ -21,6 +22,7 @@ import {
   get5MinWindowTimestamp,
   getPolymarketSlug,
   fetchEventBySlug,
+  fetchUpcomingPeriods,
   fetchClobMidpoint,
   fetchOrderBook,
   fetchTradesHistory,
@@ -128,6 +130,8 @@ export function useTradingTerminal() {
 
   // Market & Event State
   const [currentWindowTs, setCurrentWindowTs] = useState<number>(() => get5MinWindowTimestamp());
+  const [selectedWindowTs, setSelectedWindowTs] = useState<number>(() => get5MinWindowTimestamp());
+  const [upcomingPeriods, setUpcomingPeriods] = useState<MarketPeriodInfo[]>([]);
   const [activeEvent, setActiveEvent] = useState<PolymarketEvent | null>(null);
   const [activeMarket, setActiveMarket] = useState<PolymarketMarket | null>(null);
   const [upTokenId, setUpTokenId] = useState<string>('');
@@ -136,8 +140,14 @@ export function useTradingTerminal() {
   // Live Prices & Settlement
   const [spotPrice, setSpotPrice] = useState<number>(0);
   const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'neutral'>('neutral');
-  const [upPrice, setUpPrice] = useState<number>(0.50);
+  const [upPrice, setUpPriceState] = useState<number>(0.50);
   const [downPrice, setDownPrice] = useState<number>(0.50);
+  const upPriceRef = useRef<number>(0.50);
+
+  const setUpPrice = useCallback((p: number) => {
+    upPriceRef.current = p;
+    setUpPriceState(p);
+  }, []);
 
   const [settlement, setSettlement] = useState<RoundSettlementState>({
     currentWindowTs: get5MinWindowTimestamp(),
@@ -259,6 +269,7 @@ export function useTradingTerminal() {
       if (windowFloor !== currentWindowRef.current) {
         currentWindowRef.current = windowFloor;
         setCurrentWindowTs(windowFloor);
+        setSelectedWindowTs((prev) => (prev <= windowFloor ? windowFloor : prev));
 
         const newStrike = latestSpotRef.current > 0 ? latestSpotRef.current : strikePriceRef.current;
         strikePriceRef.current = newStrike;
@@ -288,10 +299,59 @@ export function useTradingTerminal() {
           });
         }
       }
+
+      // Continuous Contract Candle Progression (Guarantees chart never freezes in CONTRACT mode)
+      if (chartModeRef.current === 'CONTRACT') {
+        const curUp = upPriceRef.current > 0 && upPriceRef.current < 1 ? upPriceRef.current : 0.50;
+        const pSec = getTimeframeSeconds(timeframeRef.current);
+        const bucketTime = Math.floor(nowSec / pSec) * pSec;
+        const arr = contractActiveCandlesRef.current;
+        if (arr.length > 0) {
+          const last = arr[arr.length - 1];
+          if (last.time === bucketTime) {
+            last.high = Math.max(last.high, curUp);
+            last.low = Math.min(last.low, curUp);
+            last.close = curUp;
+            last.volume = (last.volume || 10) + 1;
+          } else if (bucketTime > last.time) {
+            arr.push({
+              time: bucketTime,
+              open: last.close,
+              high: Math.max(last.close, curUp),
+              low: Math.min(last.close, curUp),
+              close: curUp,
+              volume: 10,
+            });
+            if (arr.length > 250) arr.shift();
+          }
+          emitCandles();
+        }
+      }
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, []);
+  }, [emitCandles]);
+
+  // 1b. Poll Upcoming Periods from Polymarket
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadPeriods() {
+      try {
+        const periods = await fetchUpcomingPeriods(asset, currentWindowTs, 4);
+        if (!isCancelled && periods.length > 0) {
+          setUpcomingPeriods(periods);
+        }
+      } catch (e) {}
+    }
+
+    loadPeriods();
+    const interval = setInterval(loadPeriods, 8000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [asset, currentWindowTs]);
 
   // 2. Load SPOT Initial Candles on Asset or Timeframe Change
   useEffect(() => {
@@ -534,14 +594,17 @@ export function useTradingTerminal() {
     let isCancelled = false;
 
     async function loadMarketAndBook() {
-      let slug = getPolymarketSlug(asset, currentWindowTs);
+      const targetTs = selectedWindowTs || currentWindowTs;
+      let slug = getPolymarketSlug(asset, targetTs);
       let evt = await fetchEventBySlug(slug);
 
       if (!evt || !evt.markets || evt.markets.length === 0) {
-        const prevSlug = getPolymarketSlug(asset, currentWindowTs - 300);
-        const prevEvt = await fetchEventBySlug(prevSlug);
-        if (prevEvt && prevEvt.markets && prevEvt.markets.length > 0) {
-          evt = prevEvt;
+        if (targetTs === currentWindowTs) {
+          const prevSlug = getPolymarketSlug(asset, currentWindowTs - 300);
+          const prevEvt = await fetchEventBySlug(prevSlug);
+          if (prevEvt && prevEvt.markets && prevEvt.markets.length > 0) {
+            evt = prevEvt;
+          }
         }
       }
 
@@ -638,7 +701,8 @@ export function useTradingTerminal() {
     });
 
     const pollInterval = setInterval(async () => {
-      const targetSlug = getPolymarketSlug(asset, currentWindowTs);
+      const targetTs = selectedWindowTs || currentWindowTs;
+      const targetSlug = getPolymarketSlug(asset, targetTs);
       if (activeEvent?.slug !== targetSlug) {
         const newEvt = await fetchEventBySlug(targetSlug);
         if (newEvt && newEvt.markets && newEvt.markets.length > 0) {
@@ -672,7 +736,7 @@ export function useTradingTerminal() {
       polyWsManagerRef.current?.destroy();
       polyWsManagerRef.current = null;
     };
-  }, [asset, currentWindowTs, upTokenId, timeframe, chartMode, processContractTick, emitCandles, activeEvent?.slug]);
+  }, [asset, currentWindowTs, selectedWindowTs, upTokenId, timeframe, chartMode, processContractTick, emitCandles, activeEvent?.slug]);
 
   useEffect(() => {
     emitCandles();
@@ -698,6 +762,9 @@ export function useTradingTerminal() {
     upPrice,
     downPrice,
     currentWindowTs,
+    selectedWindowTs,
+    setSelectedWindowTs,
+    upcomingPeriods,
     settlement,
     activeCandles,
     twapLineData,
