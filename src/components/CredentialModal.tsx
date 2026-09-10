@@ -6,7 +6,6 @@ import {
   Key,
   Shield,
   ShieldCheck,
-  ShieldAlert,
   X,
   Eye,
   EyeOff,
@@ -17,8 +16,6 @@ import {
   Wallet,
   ExternalLink,
   BookOpen,
-  Check,
-  HelpCircle,
   Info,
   Sparkles,
 } from 'lucide-react';
