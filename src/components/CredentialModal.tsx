@@ -259,7 +259,9 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
         <div className={`flex items-center justify-between px-5 py-3.5 border-b ${isDark ? 'border-[#2a2e39]' : 'border-slate-200'}`}>
           <div className="flex items-center space-x-2">
             <Shield className="w-5 h-5 text-[#f0b90b]" />
-            <span className="font-black text-sm text-white tracking-wide">KREDENSIAL TRADING POLYMARKET</span>
+            <span className={`font-black text-sm tracking-wide ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              KREDENSIAL TRADING POLYMARKET
+            </span>
           </div>
           <button
             onClick={onClose}
