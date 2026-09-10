@@ -513,12 +513,21 @@ export function useTradingTerminal() {
   }, [asset, emitCandles]);
 
   // 5. Contract Candle Tick Processor
-  const processContractTick = useCallback((price: number, size: number, timestampSec: number) => {
+  const processContractTick = useCallback((price: number, size: number, timestampSec: number, outcome: 'UP' | 'DOWN' = 'UP') => {
     if (price <= 0 || price >= 1) return;
 
-    setUpPrice(price);
-    setDownPrice(parseFloat((1 - price).toFixed(3)));
+    let upP = price;
+    let downP = parseFloat((1 - price).toFixed(3));
 
+    if (outcome === 'DOWN') {
+      downP = price;
+      upP = parseFloat((1 - price).toFixed(3));
+    }
+
+    setUpPrice(upP);
+    setDownPrice(downP);
+
+    const candlePrice = upP;
     const pSec = getTimeframeSeconds(timeframeRef.current);
     const bucketTime = Math.floor(timestampSec / pSec) * pSec;
     const arr = contractActiveCandlesRef.current;
@@ -526,16 +535,16 @@ export function useTradingTerminal() {
     if (arr.length > 0) {
       const last = arr[arr.length - 1];
       if (last.time === bucketTime) {
-        last.high = Math.max(last.high, price);
-        last.low = Math.min(last.low, price);
-        last.close = price;
+        last.high = Math.max(last.high, candlePrice);
+        last.low = Math.min(last.low, candlePrice);
+        last.close = candlePrice;
         last.volume += size;
       } else if (bucketTime > last.time) {
-        arr.push({ time: bucketTime, open: price, high: price, low: price, close: price, volume: size });
+        arr.push({ time: bucketTime, open: candlePrice, high: candlePrice, low: candlePrice, close: candlePrice, volume: size });
         if (arr.length > 250) arr.shift();
       }
     } else {
-      arr.push({ time: bucketTime, open: price, high: price, low: price, close: price, volume: size });
+      arr.push({ time: bucketTime, open: candlePrice, high: candlePrice, low: candlePrice, close: candlePrice, volume: size });
     }
 
     const base1mTime = Math.floor(timestampSec / 60) * 60;
@@ -658,9 +667,9 @@ export function useTradingTerminal() {
     loadMarketAndBook();
 
     polyWsManagerRef.current = new PolymarketClobWsManager({
-      onTick: (_tokenId, price, size, side) => {
+      onTick: (_tokenId, price, size, side, outcome) => {
         const nowSec = Math.floor(Date.now() / 1000);
-        processContractTick(price, size, nowSec);
+        processContractTick(price, size, nowSec, outcome);
 
         const newTrade: TradeItem = {
           id: `trade-${nowSec}-${Math.random().toString(36).substring(2, 6)}`,
@@ -668,7 +677,7 @@ export function useTradingTerminal() {
           price,
           size,
           timestamp: nowSec,
-          outcome: 'Up',
+          outcome: outcome === 'UP' ? 'Up' : 'Down',
           pseudonym: 'CLOB Flow',
         };
 
@@ -677,22 +686,28 @@ export function useTradingTerminal() {
       onBook: (rawBids, rawAsks) => {
         const bids = rawBids
           .map((b: any) => ({ price: parseFloat(b.price), size: parseFloat(b.size) }))
-          .filter((b: any) => !isNaN(b.price))
+          .filter((b: any) => !isNaN(b.price) && b.price >= 0.001 && b.price <= 0.999)
           .sort((a, b) => b.price - a.price);
         const asks = rawAsks
           .map((a: any) => ({ price: parseFloat(a.price), size: parseFloat(a.size) }))
-          .filter((a: any) => !isNaN(a.price))
+          .filter((a: any) => !isNaN(a.price) && a.price >= 0.001 && a.price <= 0.999)
           .sort((a, b) => a.price - b.price);
 
-        const bestBid = bids[0]?.price || 0.5;
-        const bestAsk = asks[0]?.price || 0.5;
+        const bestBid = bids[0]?.price || 0;
+        const bestAsk = asks[0]?.price || 0;
+
+        let calculatedMid = upPriceRef.current;
+        if (bestBid > 0.01 && bestAsk < 0.99 && bestAsk > bestBid) {
+          calculatedMid = (bestBid + bestAsk) / 2;
+        }
+
         setOrderBook({
           bids,
           asks,
-          lastPrice: (bestBid + bestAsk) / 2,
-          bestBid,
-          bestAsk,
-          spread: Math.max(0, bestAsk - bestBid),
+          lastPrice: calculatedMid,
+          bestBid: bestBid > 0 ? bestBid : (upPriceRef.current - 0.01),
+          bestAsk: bestAsk > 0 ? bestAsk : (upPriceRef.current + 0.01),
+          spread: bestBid > 0 && bestAsk > 0 ? Math.max(0, bestAsk - bestBid) : 0.02,
         });
       },
       onStatus: (connected) => {
@@ -724,8 +739,20 @@ export function useTradingTerminal() {
         const b = await fetchOrderBook(upTokenId);
         if (b && !isCancelled) setOrderBook(b);
         const mid = await fetchClobMidpoint(upTokenId);
-        if (mid !== null && !isCancelled) {
-          processContractTick(mid, 10, Math.floor(Date.now() / 1000));
+        if (mid !== null && mid > 0.01 && mid < 0.99 && !isCancelled) {
+          processContractTick(mid, 10, Math.floor(Date.now() / 1000), 'UP');
+        } else if (activeMarket?.outcomePrices && !isCancelled) {
+          try {
+            const p = typeof activeMarket.outcomePrices === 'string'
+              ? JSON.parse(activeMarket.outcomePrices)
+              : activeMarket.outcomePrices;
+            if (Array.isArray(p) && p.length >= 2) {
+              const p0 = parseFloat(p[0]);
+              if (!isNaN(p0) && p0 > 0 && p0 < 1) {
+                processContractTick(p0, 10, Math.floor(Date.now() / 1000), 'UP');
+              }
+            }
+          } catch (e) {}
         }
       }
     }, 1500);
