@@ -2,8 +2,10 @@
 # ==========================================================
 # RADAR Trading Terminal - One-Click Launcher for Linux Mint
 # ==========================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-export PATH="$HOME/.bun/bin:$PATH"
+export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"
 
 if ! command -v bun &> /dev/null; then
     echo "[Error] Bun runtime belum terpasang."
