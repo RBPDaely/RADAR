@@ -76,7 +76,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
   return (
     <header
       className={`border-b px-2.5 sm:px-4 py-1.5 sticky top-0 z-30 shadow-md backdrop-blur select-none transition-colors flex-shrink-0 ${
-        isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-[#dbe0e7] text-slate-800'
+        isDark ? 'bg-[#181d28] border-[#2a2e39]' : 'bg-white border-slate-200 text-slate-800'
       }`}
     >
       <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-2">
