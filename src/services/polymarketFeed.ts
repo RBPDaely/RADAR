@@ -172,10 +172,18 @@ export async function fetchOrderBook(tokenId: string): Promise<OrderBookState | 
       .filter((a: any) => !isNaN(a.price) && a.price >= 0.001 && a.price <= 0.999)
       .sort((a: any, b: any) => a.price - b.price);
 
-    const bestBid = bids[0]?.price || 0.5;
-    const bestAsk = asks[0]?.price || 0.5;
-    const lastPrice = (bestBid + bestAsk) / 2;
-    const spread = Math.max(0, bestAsk - bestBid);
+    const bestBid = bids[0]?.price || 0;
+    const bestAsk = asks[0]?.price || 0;
+    
+    let lastPrice = 0;
+    if (bestBid > 0.01 && bestAsk < 0.99 && bestAsk > bestBid) {
+      lastPrice = (bestBid + bestAsk) / 2;
+    } else if (bestBid > 0.01) {
+      lastPrice = bestBid;
+    } else if (bestAsk > 0 && bestAsk < 0.99) {
+      lastPrice = bestAsk;
+    }
+    const spread = bestBid > 0 && bestAsk > 0 ? Math.max(0, bestAsk - bestBid) : 0;
 
     return {
       bids,
@@ -394,13 +402,13 @@ export class PolymarketClobWsManager {
   private reconnectTimer: any = null;
   private isDestroyed = false;
 
-  private onTickCallback: ((token: string, price: number, size: number, side: 'BUY' | 'SELL') => void) | null = null;
+  private onTickCallback: ((token: string, price: number, size: number, side: 'BUY' | 'SELL', outcome: 'UP' | 'DOWN') => void) | null = null;
   private onBookCallback: ((bids: any[], asks: any[]) => void) | null = null;
   private onStatusCallback: ((connected: boolean) => void) | null = null;
 
   constructor(
     callbacks: {
-      onTick: (token: string, price: number, size: number, side: 'BUY' | 'SELL') => void;
+      onTick: (token: string, price: number, size: number, side: 'BUY' | 'SELL', outcome: 'UP' | 'DOWN') => void;
       onBook?: (bids: any[], asks: any[]) => void;
       onStatus?: (connected: boolean) => void;
     }
@@ -442,40 +450,46 @@ export class PolymarketClobWsManager {
             if (!item) continue;
             const assetId = item.asset_id || item.market || item.token_id;
 
-            if (assetId === this.upTokenId || (!assetId && (item.bids || item.asks))) {
-              if (item.bids || item.asks) {
-                const bids = item.bids || [];
-                const asks = item.asks || [];
-                this.onBookCallback?.(bids, asks);
+            // 1. Order Book updates: ONLY apply to UP token orderbook
+            if (assetId === this.upTokenId && (item.bids || item.asks)) {
+              const bids = item.bids || [];
+              const asks = item.asks || [];
+              this.onBookCallback?.(bids, asks);
 
-                const bestBid = parseFloat(bids[0]?.price);
-                const bestAsk = parseFloat(asks[0]?.price);
-                if (!isNaN(bestBid) && !isNaN(bestAsk) && bestBid > 0 && bestAsk < 1) {
-                  const mid = (bestBid + bestAsk) / 2;
-                  this.onTickCallback?.(this.upTokenId, mid, 10, 'BUY');
-                }
+              const bestBid = parseFloat(bids[0]?.price);
+              const bestAsk = parseFloat(asks[0]?.price);
+              // Only trigger a price tick if there is a realistic market spread (spread <= 0.40)
+              // to prevent dummy 0.01 vs 0.99 spread from computing a false 0.50 midpoint!
+              if (
+                !isNaN(bestBid) &&
+                !isNaN(bestAsk) &&
+                bestBid > 0.01 &&
+                bestAsk < 0.99 &&
+                bestAsk > bestBid &&
+                (bestAsk - bestBid) <= 0.40
+              ) {
+                const mid = (bestBid + bestAsk) / 2;
+                this.onTickCallback?.(this.upTokenId, mid, 10, 'BUY', 'UP');
               }
+            }
 
-              if (item.event_type === 'last_trade_price' || (item.price && item.size)) {
-                const price = parseFloat(item.price);
-                const size = parseFloat(item.size || '10');
-                const side = item.side === 'SELL' ? 'SELL' : 'BUY';
-                if (!isNaN(price) && price > 0 && price < 1) {
-                  this.onTickCallback?.(this.upTokenId, price, size, side);
-                }
-              }
-
-              if (item.price_changes) {
-                for (const pc of item.price_changes) {
-                  const price = parseFloat(pc.price);
-                  const size = parseFloat(pc.size || '10');
-                  const side = pc.side === 'BUY' ? 'BUY' : 'SELL';
-                  if (!isNaN(price) && price > 0 && price < 1) {
-                    this.onTickCallback?.(this.upTokenId, price, size, side);
-                  }
+            // 2. Real trade execution events (actual executed fills)
+            if (item.event_type === 'last_trade_price' || (item.price && item.size && item.side)) {
+              const price = parseFloat(item.price);
+              const size = parseFloat(item.size || '10');
+              const side = item.side === 'SELL' ? 'SELL' : 'BUY';
+              if (!isNaN(price) && price > 0.001 && price < 0.999) {
+                if (assetId === this.upTokenId) {
+                  this.onTickCallback?.(this.upTokenId, price, size, side, 'UP');
+                } else if (assetId === this.downTokenId) {
+                  this.onTickCallback?.(this.downTokenId, price, size, side, 'DOWN');
                 }
               }
             }
+
+            // NOTE: item.price_changes are limit order placements/cancellations on the order book.
+            // We intentionally DO NOT treat price_changes as traded market prices to prevent
+            // phantom 50¢ jumps from maker limit orders.
           }
         } catch (e) {}
       };
