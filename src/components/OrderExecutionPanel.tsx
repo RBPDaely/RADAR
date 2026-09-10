@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CryptoAsset, ThemeMode } from '../types/market';
+import { CryptoAsset, ThemeMode, RoundSettlementState, MarketPeriodInfo } from '../types/market';
+import { getSidecarUrl } from '../config';
 import {
   TrendingUp,
   TrendingDown,
@@ -13,6 +14,8 @@ import {
   Wallet,
   X,
   Plus,
+  CornerDownRight,
+  Clock,
 } from 'lucide-react';
 
 interface OrderExecutionPanelProps {
@@ -23,6 +26,10 @@ interface OrderExecutionPanelProps {
   downTokenId: string;
   theme?: ThemeMode;
   onOpenSettings?: () => void;
+  settlement?: RoundSettlementState;
+  selectedWindowTs?: number;
+  upcomingPeriods?: MarketPeriodInfo[];
+  onSelectPeriod?: (ts: number) => void;
 }
 
 export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
@@ -33,8 +40,13 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
   downTokenId,
   theme = 'dark',
   onOpenSettings,
+  settlement,
+  selectedWindowTs,
+  upcomingPeriods = [],
+  onSelectPeriod,
 }) => {
   const isDark = theme === 'dark';
+  const [hoveredMode, setHoveredMode] = useState<'BUY' | 'SELL' | null>(null);
 
   // Mode: BUY (Entry) or SELL (Exit / Take Profit / Cut Loss)
   const [tradeMode, setTradeMode] = useState<'BUY' | 'SELL'>('BUY');
@@ -72,8 +84,8 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
   const fetchStatusAndPositions = async () => {
     try {
       const [statusRes, posRes] = await Promise.all([
-        fetch('http://127.0.0.1:3001/api/credentials/status'),
-        fetch('http://127.0.0.1:3001/api/positions'),
+        fetch(`${getSidecarUrl()}/api/credentials/status`),
+        fetch(`${getSidecarUrl()}/api/positions`),
       ]);
 
       if (statusRes.ok) {
@@ -232,7 +244,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
     setFeedback(null);
 
     try {
-      const endpoint = tradeMode === 'BUY' ? 'http://127.0.0.1:3001/api/order/buy' : 'http://127.0.0.1:3001/api/order/sell';
+      const endpoint = tradeMode === 'BUY' ? `${getSidecarUrl()}/api/order/buy` : `${getSidecarUrl()}/api/order/sell`;
       const payload = tradeMode === 'BUY'
         ? {
             asset,
@@ -320,12 +332,11 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
           <Zap className="w-4 h-4 text-[#f0b90b]" />
           <span className={isDark ? 'text-white' : 'text-slate-900'}>PANEL TRADING INSTAN</span>
         </div>
-
         {/* Live Saldo & Status */}
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-1">
             <span className={`w-2 h-2 rounded-full ${sidecarConnected ? 'bg-[#089981] animate-pulse' : 'bg-[#f23645]'}`} />
-            <span className={`text-[10px] font-bold ${sidecarConnected ? 'text-[#089981]' : 'text-[#f23645]'}`}>
+            <span className={`text-[10px] font-bold ${sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}`}>
               {sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}
             </span>
           </div>
@@ -338,40 +349,218 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         </div>
       </div>
 
-      {/* Mode Selector Tabs: BELI vs JUAL */}
-      <div className="grid grid-cols-2 gap-2 mb-2.5">
-        <button
-          onClick={() => setTradeMode('BUY')}
-          className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
-            tradeMode === 'BUY'
-              ? 'bg-[#089981] text-white border-[#089981] shadow-[0_0_15px_rgba(8,153,129,0.4)]'
-              : isDark
-              ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white'
-              : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-black'
-          }`}
-        >
-          <ArrowUpRight className="w-4 h-4" />
-          <span>BELI (ENTRY POSISI)</span>
-        </button>
+      {/* 0. Multi-Period Upcoming Markets Selector (Sesuai Data Polymarket) */}
+      {upcomingPeriods && upcomingPeriods.length > 0 && onSelectPeriod && (
+        <div className="mb-2.5 space-y-1">
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#787b86]">
+            <span className="flex items-center space-x-1 font-bold">
+              <Clock className="w-3 h-3 text-[#f0b90b]" />
+              <span>PERIODE PASAR POLYMARKET:</span>
+            </span>
+            <span className="text-[9px] text-[#089981] font-bold">SINKRON RESMI</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 select-none">
+            {upcomingPeriods.map((p) => {
+              const isSelected = selectedWindowTs ? selectedWindowTs === p.windowTs : p.isCurrent;
+              return (
+                <button
+                  key={p.windowTs}
+                  onClick={() => onSelectPeriod(p.windowTs)}
+                  className={`px-1.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold flex flex-col items-center justify-center transition-all ${
+                    isSelected
+                      ? 'bg-[#f0b90b] text-slate-950 border-[#f0b90b] shadow-[0_0_10px_rgba(240,185,11,0.4)] font-black ring-1 ring-[#f0b90b]'
+                      : isDark
+                      ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white hover:border-slate-600'
+                      : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-black'
+                  }`}
+                  title={`Klik untuk memantau & beli periode ${p.label}`}
+                >
+                  <span className="truncate w-full text-center">{p.isCurrent ? '🟢 AKTIF' : p.label.split(' ')[0]}</span>
+                  <span className="text-[9px] opacity-80">{p.label.includes('(') ? p.label.split('(')[1].replace(')', '') : ''}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-        <button
-          onClick={() => setTradeMode('SELL')}
-          className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
-            tradeMode === 'SELL'
-              ? 'bg-[#ea580c] text-white border-[#ea580c] shadow-[0_0_15px_rgba(234,88,12,0.4)]'
-              : isDark
-              ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-amber-400'
-              : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-amber-600'
-          }`}
-        >
-          <ArrowDownRight className="w-4 h-4" />
-          <span>JUAL (TUTUP / TAKE PROFIT)</span>
-        </button>
+      {/* 1. KOTAK ODDS UP & DOWN (Relokasi dari Atas Chart ke Atas Menu BUY/SELL) */}
+      {(() => {
+        const validUpPrice = Math.max(0.01, Math.min(0.99, isNaN(upPrice) ? 0.50 : upPrice));
+        const validDownPrice = Math.max(0.01, Math.min(0.99, isNaN(downPrice) ? 0.50 : downPrice));
+        const upCents = (validUpPrice * 100).toFixed(1);
+        const downCents = (validDownPrice * 100).toFixed(1);
+        const upRoi = ((1 / validUpPrice) - 1) * 100;
+        const downRoi = ((1 / validDownPrice) - 1) * 100;
+        const isUpWinning = settlement ? settlement.isUpWinning : validUpPrice >= 0.50;
+        const upPct = (validUpPrice * 100).toFixed(0);
+        const downPct = (validDownPrice * 100).toFixed(0);
+
+        return (
+          <div className={`p-2 rounded-xl border mb-2.5 ${isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="grid grid-cols-2 gap-1.5 items-stretch">
+              {/* UP ODDS CARD */}
+              <div
+                className={`rounded-lg px-2.5 py-1.5 border transition-all flex items-center justify-between ${
+                  isUpWinning
+                    ? isDark
+                      ? 'bg-[radial-gradient(ellipse_at_right,_var(--tw-gradient-stops))] from-[#089981]/30 via-[#0d2b20] to-[#131722] border-[#089981] shadow-[0_0_12px_rgba(8,153,129,0.3)] ring-1 ring-[#089981]'
+                      : 'bg-emerald-50 border-[#089981] shadow-sm ring-1 ring-[#089981]'
+                    : isDark
+                    ? 'bg-[#1e222d]/60 border-[#2a2e39]'
+                    : 'bg-white border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center space-x-1">
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#089981]" />
+                    <span className="text-[10px] font-mono font-black uppercase text-[#089981]">UP (NAIK)</span>
+                  </div>
+                  <div className="text-[9px] font-mono text-[#787b86]">
+                    ROI: <strong className="text-[#089981]">+{upRoi.toFixed(0)}%</strong>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xl font-mono font-black text-[#089981]">{upCents}¢</span>
+                </div>
+              </div>
+
+              {/* DOWN ODDS CARD */}
+              <div
+                className={`rounded-lg px-2.5 py-1.5 border transition-all flex items-center justify-between ${
+                  !isUpWinning
+                    ? isDark
+                      ? 'bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-[#f23645]/30 via-[#2e1219] to-[#131722] border-[#f23645] shadow-[0_0_12px_rgba(242,54,69,0.3)] ring-1 ring-[#f23645]'
+                      : 'bg-rose-50 border-[#f23645] shadow-sm ring-1 ring-[#f23645]'
+                    : isDark
+                    ? 'bg-[#1e222d]/60 border-[#2a2e39]'
+                    : 'bg-white border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center space-x-1">
+                    <ArrowDownRight className="w-3.5 h-3.5 text-[#f23645]" />
+                    <span className="text-[10px] font-mono font-black uppercase text-[#f23645]">DOWN (TURUN)</span>
+                  </div>
+                  <div className="text-[9px] font-mono text-[#787b86]">
+                    ROI: <strong className="text-[#f23645]">+{downRoi.toFixed(0)}%</strong>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xl font-mono font-black text-[#f23645]">{downCents}¢</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mini Energy Duel Bar */}
+            <div className="relative w-full h-1.5 rounded-full overflow-hidden flex bg-[#1e222d] mt-1.5">
+              <div className="h-full bg-gradient-to-r from-[#089981] to-[#00ff88]" style={{ width: `${upPct}%` }} />
+              <div className="h-full bg-gradient-to-l from-[#f23645] to-[#ff3b69]" style={{ width: `${downPct}%` }} />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 2. MODE SELECTOR TABS DENGAN INTERACTIVE DECISION TREE ARROWS (MODEL 1) */}
+      <div className="mb-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setTradeMode('BUY')}
+            onMouseEnter={() => setHoveredMode('BUY')}
+            onMouseLeave={() => setHoveredMode(null)}
+            className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+              tradeMode === 'BUY'
+                ? 'bg-[#089981] text-white border-[#089981] shadow-[0_0_15px_rgba(8,153,129,0.4)]'
+                : hoveredMode === 'BUY'
+                ? 'bg-[#089981]/20 text-[#089981] border-[#089981]/60'
+                : isDark
+                ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white'
+                : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-black'
+            }`}
+          >
+            <ArrowUpRight className="w-4 h-4" />
+            <span>BELI (ENTRY POSISI)</span>
+          </button>
+
+          <button
+            onClick={() => setTradeMode('SELL')}
+            onMouseEnter={() => setHoveredMode('SELL')}
+            onMouseLeave={() => setHoveredMode(null)}
+            className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+              tradeMode === 'SELL'
+                ? 'bg-[#ea580c] text-white border-[#ea580c] shadow-[0_0_15px_rgba(234,88,12,0.4)]'
+                : hoveredMode === 'SELL'
+                ? 'bg-[#ea580c]/20 text-[#ea580c] border-[#ea580c]/60'
+                : isDark
+                ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-amber-400'
+                : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-amber-600'
+            }`}
+          >
+            <ArrowDownRight className="w-4 h-4" />
+            <span>JUAL (TUTUP / TAKE PROFIT)</span>
+          </button>
+        </div>
+
+        {/* DECISION TREE BRANCHING ARROWS (Pohon Keputusan Visual agar Otak Tidak Keliru) */}
+        {(hoveredMode === 'BUY' || (!hoveredMode && tradeMode === 'BUY')) && (
+          <div className={`mt-1.5 p-2 rounded-lg border text-[11px] font-mono transition-all ${
+            isDark ? 'bg-[#131722] border-[#089981]/40' : 'bg-emerald-50/70 border-[#089981]/30'
+          }`}>
+            <div className="flex items-center space-x-1.5 text-[#089981] font-bold text-[10px] mb-1">
+              <CornerDownRight className="w-3.5 h-3.5" />
+              <span>PANDUAN ENTRY (TEBAK HARGA):</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
+                outcome === 'UP' && tradeMode === 'BUY' ? 'bg-[#089981]/25 border-[#089981] text-white font-bold' : 'border-slate-800 text-[#787b86]'
+              }`}>
+                <span className="text-[#089981] font-black">↳ 🟢</span>
+                <span className="truncate"><strong>BELI UP</strong> (Tebak Naik)</span>
+              </div>
+              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
+                outcome === 'DOWN' && tradeMode === 'BUY' ? 'bg-[#f23645]/25 border-[#f23645] text-white font-bold' : 'border-slate-800 text-[#787b86]'
+              }`}>
+                <span className="text-[#f23645] font-black">↳ 🔴</span>
+                <span className="truncate"><strong>BELI DOWN</strong> (Tebak Turun)</span>
+              </div>
+            </div>
+            <div className="text-[9.5px] text-amber-400/90 mt-1 font-sans italic text-center">
+              💡 Ingat: Jika Anda memprediksi harga TURUN, pilih <strong className="text-[#f23645]">BELI DOWN</strong> (jangan tekan tab Jual).
+            </div>
+          </div>
+        )}
+
+        {(hoveredMode === 'SELL' || (!hoveredMode && tradeMode === 'SELL')) && (
+          <div className={`mt-1.5 p-2 rounded-lg border text-[11px] font-mono transition-all ${
+            isDark ? 'bg-[#131722] border-amber-500/40' : 'bg-amber-50/70 border-amber-500/30'
+          }`}>
+            <div className="flex items-center space-x-1.5 text-amber-500 font-bold text-[10px] mb-1">
+              <CornerDownRight className="w-3.5 h-3.5" />
+              <span>PANDUAN EXIT (LEPAS POSISI):</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
+                outcome === 'UP' && tradeMode === 'SELL' ? 'bg-amber-500/25 border-amber-500 text-white font-bold' : 'border-slate-800 text-[#787b86]'
+              }`}>
+                <span className="text-amber-500 font-black">↳ 🟠</span>
+                <span className="truncate"><strong>JUAL UP</strong> (Tutup Saham Up)</span>
+              </div>
+              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
+                outcome === 'DOWN' && tradeMode === 'SELL' ? 'bg-orange-500/25 border-orange-500 text-white font-bold' : 'border-slate-800 text-[#787b86]'
+              }`}>
+                <span className="text-orange-500 font-black">↳ 🟠</span>
+                <span className="truncate"><strong>JUAL DOWN</strong> (Tutup Saham Down)</span>
+              </div>
+            </div>
+            <div className="text-[9.5px] text-amber-300 mt-1 font-sans italic text-center">
+              ℹ️ Tab JUAL hanya dipakai untuk melepas saham yang sedang Anda miliki (Take Profit / Cut Loss).
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
       {/* 1. JIKA MODE BELI: HANYA TAMPILKAN FITUR BUY SECARA LUAS & NYAMAN */}
-      {/* ========================================================================= */}
       {tradeMode === 'BUY' && (
         <div className="space-y-2">
           {/* Outcome Selector (UP vs DOWN) */}
@@ -380,28 +569,34 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
               onClick={() => setOutcome('UP')}
               className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'UP'
-                  ? 'bg-[#089981] text-white border-[#089981] shadow-md'
+                  ? 'bg-[#089981] text-white border-[#089981] shadow-md ring-1 ring-[#089981]'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-[#089981]'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-[#089981]'
               }`}
             >
               <TrendingUp className="w-4 h-4" />
-              <span>BELI UP ({(upPrice * 100).toFixed(1)}¢)</span>
+              <div className="flex flex-col text-left">
+                <span>BELI UP ({(upPrice * 100).toFixed(1)}¢)</span>
+                <span className="text-[9px] opacity-80 font-normal">🟢 TEBAK TREN NAIK</span>
+              </div>
             </button>
 
             <button
               onClick={() => setOutcome('DOWN')}
               className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'DOWN'
-                  ? 'bg-[#f23645] text-white border-[#f23645] shadow-md'
+                  ? 'bg-[#f23645] text-white border-[#f23645] shadow-md ring-1 ring-[#f23645]'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-[#f23645]'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-[#f23645]'
               }`}
             >
               <TrendingDown className="w-4 h-4" />
-              <span>BELI DOWN ({(downPrice * 100).toFixed(1)}¢)</span>
+              <div className="flex flex-col text-left">
+                <span>BELI DOWN ({(downPrice * 100).toFixed(1)}¢)</span>
+                <span className="text-[9px] opacity-80 font-normal">🔴 TEBAK TREN TURUN</span>
+              </div>
             </button>
           </div>
 
@@ -594,28 +789,34 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
               onClick={() => setOutcome('UP')}
               className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'UP'
-                  ? 'bg-amber-600 text-white border-amber-500 shadow-md'
+                  ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-1 ring-amber-400'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-amber-400'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-amber-600'
               }`}
             >
               <TrendingUp className="w-4 h-4" />
-              <span>JUAL UP ({(upPrice * 100).toFixed(1)}¢)</span>
+              <div className="flex flex-col text-left">
+                <span>JUAL UP ({(upPrice * 100).toFixed(1)}¢)</span>
+                <span className="text-[9px] opacity-80 font-normal">🟠 TUTUP SAHAM UP</span>
+              </div>
             </button>
 
             <button
               onClick={() => setOutcome('DOWN')}
               className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'DOWN'
-                  ? 'bg-orange-600 text-white border-orange-500 shadow-md'
+                  ? 'bg-orange-600 text-white border-orange-500 shadow-md ring-1 ring-orange-400'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-orange-400'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-orange-600'
               }`}
             >
               <TrendingDown className="w-4 h-4" />
-              <span>JUAL DOWN ({(downPrice * 100).toFixed(1)}¢)</span>
+              <div className="flex flex-col text-left">
+                <span>JUAL DOWN ({(downPrice * 100).toFixed(1)}¢)</span>
+                <span className="text-[9px] opacity-80 font-normal">🟠 TUTUP SAHAM DOWN</span>
+              </div>
             </button>
           </div>
 
