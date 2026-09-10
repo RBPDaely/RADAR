@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "bash start.sh",
-    "dev": "vite",
+    "dev": "vite --host",
     "sidecar": "bun run server/index.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
