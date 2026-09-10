@@ -297,7 +297,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
   return (
     <div
       className={`border rounded-xl p-3 flex flex-col font-mono text-xs shadow-md select-none transition-colors relative ${
-        isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-[#dbe0e7] text-slate-800'
+        isDark ? 'bg-[#181d28] border-[#2a2e39]' : 'bg-white border-slate-200 text-slate-800'
       }`}
     >
       {/* Auto-Dismiss Floating Toast Notification */}
@@ -329,27 +329,29 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
       {/* Panel Header & Saldo */}
       <div className={`flex items-center justify-between pb-1.5 border-b mb-2 ${isDark ? 'border-[#2a2e39]' : 'border-slate-200'}`}>
         <div className="flex items-center space-x-2 font-black text-xs uppercase tracking-wide">
-          <Zap className="w-3.5 h-3.5 text-[#f0b90b]" />
+          <Zap className="w-3.5 h-3.5 text-amber-500" />
           <span className={isDark ? 'text-white' : 'text-slate-900'}>PANEL TRADING INSTAN</span>
         </div>
         {/* Live Saldo & Status */}
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-1">
-            <span className={`w-2 h-2 rounded-full ${sidecarConnected ? 'bg-[#00e676] animate-pulse shadow-[0_0_8px_#00e676]' : 'bg-[#ff1744]'}`} />
-            <span className={`text-[10px] font-bold ${sidecarConnected ? (hasCredentials ? 'text-[#00e676]' : 'text-amber-400') : 'text-[#ff1744]'}`}>
+            <span className={`w-2 h-2 rounded-full ${sidecarConnected ? (isDark ? 'bg-[#089981]' : 'bg-emerald-600') : 'bg-[#f23645]'}`} />
+            <span className={`text-[10px] font-bold ${sidecarConnected ? (hasCredentials ? (isDark ? 'text-[#26a69a]' : 'text-emerald-700') : 'text-amber-500') : 'text-[#f23645]'}`}>
               {sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}
             </span>
           </div>
           {usdcBalance !== null && (
-            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-[#00e676]/50 text-[#00e676]">
-              <span className="text-[10px] font-bold text-[#787b86]">SALDO:</span>
-              <strong className="text-xs font-mono text-white font-black">${usdcBalance.toFixed(2)}</strong>
+            <div className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border ${
+              isDark ? 'bg-[#142621] border-[#089981]/50 text-[#26a69a]' : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+            }`}>
+              <span className={`text-[10px] font-bold ${isDark ? 'text-[#787b86]' : 'text-slate-500'}`}>SALDO:</span>
+              <strong className={`text-xs font-mono font-black ${isDark ? 'text-white' : 'text-emerald-950'}`}>${usdcBalance.toFixed(2)}</strong>
             </div>
           )}
         </div>
       </div>
 
-      {/* 1. KOTAK NILAI UP & DOWN (WARNA KHUSUS CYBERPUNK GLOW) */}
+      {/* 1. KOTAK NILAI UP & DOWN (Desain Profesional, Kontras Tajam, Nyaman di Mata & Otak) */}
       {(() => {
         const validUpPrice = Math.max(0.01, Math.min(0.99, isNaN(upPrice) ? 0.50 : upPrice));
         const validDownPrice = Math.max(0.01, Math.min(0.99, isNaN(downPrice) ? 0.50 : downPrice));
@@ -362,124 +364,146 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         const downPct = (validDownPrice * 100).toFixed(0);
 
         return (
-          <div className={`p-2 rounded-xl border mb-2 shadow-lg transition-all ${
+          <div className={`p-2 rounded-xl border mb-2 transition-all ${
             isDark
-              ? 'bg-gradient-to-b from-[#131722] via-[#0d1017] to-[#131722] border-[#2a2e39]'
-              : 'bg-gradient-to-b from-slate-50 to-slate-100 border-slate-300'
+              ? 'bg-[#141822] border-[#2a2e39]'
+              : 'bg-slate-50 border-slate-200'
           }`}>
             <div className="grid grid-cols-2 gap-2 items-stretch">
               
-              {/* === KOTAK NILAI UP (WARNA KHUSUS NEON EMERALD) === */}
+              {/* === KOTAK NILAI UP === */}
               <div
                 onClick={() => setOutcome('UP')}
                 role="button"
                 tabIndex={0}
-                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none overflow-hidden group ${
+                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none ${
                   outcome === 'UP'
-                    ? 'ring-2 ring-[#00e676] ring-offset-1 ring-offset-black'
-                    : 'opacity-90 hover:opacity-100'
+                    ? isDark
+                      ? 'ring-2 ring-[#089981] ring-offset-1 ring-offset-[#141822]'
+                      : 'ring-2 ring-emerald-600 ring-offset-1 ring-offset-white'
+                    : 'opacity-95 hover:opacity-100'
                 } ${
                   isDark
-                    ? 'bg-gradient-to-br from-[#04281c] via-[#021d14] to-[#01120c] border-[#00e676] shadow-[0_0_18px_rgba(0,230,118,0.28)]'
-                    : 'bg-gradient-to-br from-emerald-100 via-emerald-50 to-white border-[#00b05b] shadow-md'
+                    ? 'bg-[#142620] border-[#089981] text-[#e0e3eb]'
+                    : 'bg-emerald-50/90 border-emerald-500 shadow-sm text-slate-900'
                 }`}
-                title="Klik untuk memilih beli/jual UP"
+                title="Klik untuk memilih UP"
               >
-                {/* Radial ambient background aura */}
-                <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#00e676]/20 rounded-full blur-xl pointer-events-none" />
-
-                {/* Top Row: Label & Leading Crown */}
-                <div className="flex items-center justify-between mb-1 relative z-10">
-                  <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-[#00e676]/20 border border-[#00e676]/50">
-                    <ArrowUpRight className="w-3.5 h-3.5 text-[#00ff88]" />
-                    <span className="text-[10px] font-mono font-black uppercase text-[#00ff88] tracking-wider">
-                      UP (NAIK)
-                    </span>
+                {/* Top Row: Label & Status */}
+                <div className="flex items-center justify-between mb-1">
+                  <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-black uppercase tracking-wider ${
+                    isDark
+                      ? 'bg-[#089981]/20 border border-[#089981]/40 text-[#26a69a]'
+                      : 'bg-emerald-100 border border-emerald-300 text-emerald-900'
+                  }`}>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    <span>UP (NAIK)</span>
                   </div>
                   {isUpWinning ? (
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-[#00ff88] text-black shadow-[0_0_8px_#00ff88] animate-pulse">
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                      isDark ? 'bg-[#089981] text-white' : 'bg-emerald-700 text-white shadow-sm'
+                    }`}>
                       👑 MEMIMPIN
                     </span>
                   ) : (
-                    <span className="text-[9px] font-mono text-[#00e676]/80 font-bold">
+                    <span className={`text-[9.5px] font-mono font-bold ${
+                      isDark ? 'text-[#26a69a]' : 'text-emerald-700'
+                    }`}>
                       {upPct}%
                     </span>
                   )}
                 </div>
 
-                {/* Middle Row: Massive Radiant Price (Odds Cents) */}
-                <div className="flex items-baseline justify-between mt-1 relative z-10">
-                  <span className="text-[10px] text-[#787b86] font-bold">NILAI KONTRAK:</span>
+                {/* Middle Row: Crisp, Ultra-Sharp Price Display (NO BLUR, NO FOG) */}
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className={`text-[10px] font-bold ${isDark ? 'text-[#787b86]' : 'text-slate-600'}`}>
+                    NILAI KONTRAK:
+                  </span>
                   <div className="flex items-baseline space-x-0.5">
-                    <span className="text-2xl sm:text-3xl font-mono font-black text-[#00ff88] drop-shadow-[0_0_12px_rgba(0,255,136,0.65)]">
+                    <span className={`text-2xl sm:text-3xl font-mono font-black tracking-tight ${
+                      isDark ? 'text-[#26a69a]' : 'text-emerald-900 font-black'
+                    }`}>
                       {upCents}
                     </span>
-                    <span className="text-sm font-bold text-[#00e676]">¢</span>
+                    <span className={`text-sm font-bold ${isDark ? 'text-[#26a69a]' : 'text-emerald-700'}`}>¢</span>
                   </div>
                 </div>
 
-                {/* Bottom Row: Projected ROI badge */}
-                <div className="flex items-center justify-between pt-1 mt-1 border-t border-[#00e676]/30 text-[9.5px] font-mono relative z-10">
-                  <span className="text-[#787b86]">ESTIMASI ROI:</span>
-                  <strong className="text-[#00ff88] font-black drop-shadow-[0_0_6px_rgba(0,255,136,0.5)]">
+                {/* Bottom Row: ROI Badge */}
+                <div className={`flex items-center justify-between pt-1 mt-1 border-t text-[9.5px] font-mono ${
+                  isDark ? 'border-[#089981]/30' : 'border-emerald-200'
+                }`}>
+                  <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>ESTIMASI ROI:</span>
+                  <strong className={`font-black ${isDark ? 'text-[#26a69a]' : 'text-emerald-800'}`}>
                     +{upRoi.toFixed(0)}%
                   </strong>
                 </div>
               </div>
 
-              {/* === KOTAK NILAI DOWN (WARNA KHUSUS NEON CRIMSON/RUBY) === */}
+              {/* === KOTAK NILAI DOWN === */}
               <div
                 onClick={() => setOutcome('DOWN')}
                 role="button"
                 tabIndex={0}
-                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none overflow-hidden group ${
+                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none ${
                   outcome === 'DOWN'
-                    ? 'ring-2 ring-[#ff1744] ring-offset-1 ring-offset-black'
-                    : 'opacity-90 hover:opacity-100'
+                    ? isDark
+                      ? 'ring-2 ring-[#f23645] ring-offset-1 ring-offset-[#141822]'
+                      : 'ring-2 ring-rose-600 ring-offset-1 ring-offset-white'
+                    : 'opacity-95 hover:opacity-100'
                 } ${
                   isDark
-                    ? 'bg-gradient-to-br from-[#380b15] via-[#26060e] to-[#160307] border-[#ff1744] shadow-[0_0_18px_rgba(255,23,68,0.28)]'
-                    : 'bg-gradient-to-br from-rose-100 via-rose-50 to-white border-[#d50000] shadow-md'
+                    ? 'bg-[#2b171c] border-[#f23645] text-[#e0e3eb]'
+                    : 'bg-rose-50/90 border-rose-500 shadow-sm text-slate-900'
                 }`}
-                title="Klik untuk memilih beli/jual DOWN"
+                title="Klik untuk memilih DOWN"
               >
-                {/* Radial ambient background aura */}
-                <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#ff1744]/20 rounded-full blur-xl pointer-events-none" />
-
-                {/* Top Row: Label & Leading Crown */}
-                <div className="flex items-center justify-between mb-1 relative z-10">
-                  <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-[#ff1744]/20 border border-[#ff1744]/50">
-                    <ArrowDownRight className="w-3.5 h-3.5 text-[#ff3b69]" />
-                    <span className="text-[10px] font-mono font-black uppercase text-[#ff3b69] tracking-wider">
-                      DOWN (TURUN)
-                    </span>
+                {/* Top Row: Label & Status */}
+                <div className="flex items-center justify-between mb-1">
+                  <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-black uppercase tracking-wider ${
+                    isDark
+                      ? 'bg-[#f23645]/20 border border-[#f23645]/40 text-[#f23645]'
+                      : 'bg-rose-100 border border-rose-300 text-rose-900'
+                  }`}>
+                    <ArrowDownRight className="w-3.5 h-3.5" />
+                    <span>DOWN (TURUN)</span>
                   </div>
                   {!isUpWinning ? (
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-[#ff3b69] text-white shadow-[0_0_8px_#ff3b69] animate-pulse">
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                      isDark ? 'bg-[#f23645] text-white' : 'bg-rose-700 text-white shadow-sm'
+                    }`}>
                       👑 MEMIMPIN
                     </span>
                   ) : (
-                    <span className="text-[9px] font-mono text-[#ff1744]/80 font-bold">
+                    <span className={`text-[9.5px] font-mono font-bold ${
+                      isDark ? 'text-[#f23645]' : 'text-rose-700'
+                    }`}>
                       {downPct}%
                     </span>
                   )}
                 </div>
 
-                {/* Middle Row: Massive Radiant Price (Odds Cents) */}
-                <div className="flex items-baseline justify-between mt-1 relative z-10">
-                  <span className="text-[10px] text-[#787b86] font-bold">NILAI KONTRAK:</span>
+                {/* Middle Row: Crisp, Ultra-Sharp Price Display (NO BLUR, NO FOG) */}
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className={`text-[10px] font-bold ${isDark ? 'text-[#787b86]' : 'text-slate-600'}`}>
+                    NILAI KONTRAK:
+                  </span>
                   <div className="flex items-baseline space-x-0.5">
-                    <span className="text-2xl sm:text-3xl font-mono font-black text-[#ff3b69] drop-shadow-[0_0_12px_rgba(255,59,105,0.65)]">
+                    <span className={`text-2xl sm:text-3xl font-mono font-black tracking-tight ${
+                      isDark ? 'text-[#f23645]' : 'text-rose-900 font-black'
+                    }`}>
                       {downCents}
                     </span>
-                    <span className="text-sm font-bold text-[#ff1744]">¢</span>
+                    <span className={`text-sm font-bold ${isDark ? 'text-[#f23645]' : 'text-rose-700'}`}>¢</span>
                   </div>
                 </div>
 
-                {/* Bottom Row: Projected ROI badge */}
-                <div className="flex items-center justify-between pt-1 mt-1 border-t border-[#ff1744]/30 text-[9.5px] font-mono relative z-10">
-                  <span className="text-[#787b86]">ESTIMASI ROI:</span>
-                  <strong className="text-[#ff3b69] font-black drop-shadow-[0_0_6px_rgba(255,59,105,0.5)]">
+                {/* Bottom Row: ROI Badge */}
+                <div className={`flex items-center justify-between pt-1 mt-1 border-t text-[9.5px] font-mono ${
+                  isDark ? 'border-[#f23645]/30' : 'border-rose-200'
+                }`}>
+                  <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>ESTIMASI ROI:</span>
+                  <strong className={`font-black ${isDark ? 'text-[#f23645]' : 'text-rose-800'}`}>
                     +{downRoi.toFixed(0)}%
                   </strong>
                 </div>
@@ -487,23 +511,35 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
 
             </div>
 
-            {/* Neon Dual Energy Power Duel Bar */}
-            <div className="relative w-full h-2 rounded-full overflow-hidden flex bg-black/60 mt-2 p-0.5 border border-[#2a2e39]">
+            {/* Clean Dual Power Bar */}
+            <div className={`relative w-full h-2 rounded-full overflow-hidden flex mt-2 p-0.5 border ${
+              isDark ? 'bg-[#1e222d] border-[#2a2e39]' : 'bg-slate-200 border-slate-300'
+            }`}>
               <div
-                className="h-full rounded-l-full bg-gradient-to-r from-[#00c853] to-[#00e676] shadow-[0_0_10px_rgba(0,230,118,0.7)] transition-all duration-300"
+                className={`h-full rounded-l-full transition-all duration-300 ${
+                  isDark ? 'bg-[#089981]' : 'bg-emerald-600'
+                }`}
                 style={{ width: `${upPct}%` }}
                 title={`Kekuatan UP: ${upPct}%`}
               />
               <div
-                className="h-full rounded-r-full bg-gradient-to-l from-[#d50000] to-[#ff1744] shadow-[0_0_10px_rgba(255,23,68,0.7)] transition-all duration-300"
+                className={`h-full rounded-r-full transition-all duration-300 ${
+                  isDark ? 'bg-[#f23645]' : 'bg-rose-600'
+                }`}
                 style={{ width: `${downPct}%` }}
                 title={`Kekuatan DOWN: ${downPct}%`}
               />
             </div>
-            <div className="flex items-center justify-between text-[8.5px] font-mono text-[#787b86] mt-0.5 px-0.5">
-              <span className="text-[#00e676] font-bold">UP: {upPct}%</span>
-              <span className="text-[8px] uppercase tracking-wider text-[#787b86]">Kekuatan Pasar</span>
-              <span className="text-[#ff1744] font-bold">DOWN: {downPct}%</span>
+            <div className="flex items-center justify-between text-[9px] font-mono mt-0.5 px-0.5">
+              <span className={`font-bold ${isDark ? 'text-[#26a69a]' : 'text-emerald-800'}`}>
+                UP: {upPct}%
+              </span>
+              <span className={`text-[8.5px] uppercase tracking-wider ${isDark ? 'text-[#787b86]' : 'text-slate-500'}`}>
+                Kekuatan Pasar
+              </span>
+              <span className={`font-bold ${isDark ? 'text-[#f23645]' : 'text-rose-800'}`}>
+                DOWN: {downPct}%
+              </span>
             </div>
           </div>
         );
@@ -518,12 +554,12 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             onMouseLeave={() => setHoveredMode(null)}
             className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
               tradeMode === 'BUY'
-                ? 'bg-[#089981] text-white border-[#089981] shadow-[0_0_15px_rgba(8,153,129,0.4)]'
+                ? 'bg-[#089981] text-white border-[#089981] shadow-sm'
                 : hoveredMode === 'BUY'
                 ? 'bg-[#089981]/20 text-[#089981] border-[#089981]/60'
                 : isDark
-                ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white'
-                : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-black'
+                ? 'bg-[#1e222d] border-[#2a2e39] text-[#9598a1] hover:text-white'
+                : 'bg-slate-100 border-slate-300 text-slate-700 hover:text-black'
             }`}
           >
             <ArrowUpRight className="w-4 h-4" />
@@ -536,12 +572,12 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             onMouseLeave={() => setHoveredMode(null)}
             className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
               tradeMode === 'SELL'
-                ? 'bg-[#ea580c] text-white border-[#ea580c] shadow-[0_0_15px_rgba(234,88,12,0.4)]'
+                ? 'bg-[#ea580c] text-white border-[#ea580c] shadow-sm'
                 : hoveredMode === 'SELL'
                 ? 'bg-[#ea580c]/20 text-[#ea580c] border-[#ea580c]/60'
                 : isDark
-                ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-amber-400'
-                : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-amber-600'
+                ? 'bg-[#1e222d] border-[#2a2e39] text-[#9598a1] hover:text-amber-400'
+                : 'bg-slate-100 border-slate-300 text-slate-700 hover:text-amber-700'
             }`}
           >
             <ArrowDownRight className="w-4 h-4" />
@@ -552,55 +588,87 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         {/* DECISION TREE BRANCHING ARROWS (Pohon Keputusan Visual agar Otak Tidak Keliru) */}
         {(hoveredMode === 'BUY' || (!hoveredMode && tradeMode === 'BUY')) && (
           <div className={`mt-1.5 p-2 rounded-lg border text-[11px] font-mono transition-all ${
-            isDark ? 'bg-[#131722] border-[#089981]/40' : 'bg-emerald-50/70 border-[#089981]/30'
+            isDark ? 'bg-[#142620] border-[#089981]/40' : 'bg-emerald-50 border-emerald-300 text-slate-900'
           }`}>
-            <div className="flex items-center space-x-1.5 text-[#089981] font-bold text-[10px] mb-1">
+            <div className={`flex items-center space-x-1.5 font-bold text-[10px] mb-1 ${
+              isDark ? 'text-[#26a69a]' : 'text-emerald-800'
+            }`}>
               <CornerDownRight className="w-3.5 h-3.5" />
               <span>PANDUAN ENTRY (TEBAK HARGA):</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'UP' && tradeMode === 'BUY' ? 'bg-[#089981]/25 border-[#089981] text-white font-bold' : 'border-slate-800 text-[#787b86]'
+                outcome === 'UP' && tradeMode === 'BUY'
+                  ? isDark
+                    ? 'bg-[#089981]/30 border-[#089981] text-white font-bold'
+                    : 'bg-emerald-100 border-emerald-500 text-emerald-950 font-black'
+                  : isDark
+                  ? 'border-[#2a2e39] text-[#787b86]'
+                  : 'bg-white border-slate-200 text-slate-600'
               }`}>
-                <span className="text-[#089981] font-black">↳ 🟢</span>
+                <span className={isDark ? 'text-[#26a69a] font-black' : 'text-emerald-700 font-black'}>↳ 🟢</span>
                 <span className="truncate"><strong>BELI UP</strong> (Tebak Naik)</span>
               </div>
               <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'DOWN' && tradeMode === 'BUY' ? 'bg-[#f23645]/25 border-[#f23645] text-white font-bold' : 'border-slate-800 text-[#787b86]'
+                outcome === 'DOWN' && tradeMode === 'BUY'
+                  ? isDark
+                    ? 'bg-[#f23645]/30 border-[#f23645] text-white font-bold'
+                    : 'bg-rose-100 border-rose-500 text-rose-950 font-black'
+                  : isDark
+                  ? 'border-[#2a2e39] text-[#787b86]'
+                  : 'bg-white border-slate-200 text-slate-600'
               }`}>
-                <span className="text-[#f23645] font-black">↳ 🔴</span>
+                <span className={isDark ? 'text-[#f23645] font-black' : 'text-rose-700 font-black'}>↳ 🔴</span>
                 <span className="truncate"><strong>BELI DOWN</strong> (Tebak Turun)</span>
               </div>
             </div>
-            <div className="text-[9.5px] text-amber-400/90 mt-1 font-sans italic text-center">
-              💡 Ingat: Jika Anda memprediksi harga TURUN, pilih <strong className="text-[#f23645]">BELI DOWN</strong> (jangan tekan tab Jual).
+            <div className={`text-[9.5px] mt-1 font-sans italic text-center ${
+              isDark ? 'text-amber-400/90' : 'text-amber-800 font-semibold'
+            }`}>
+              💡 Ingat: Jika Anda memprediksi harga TURUN, pilih <strong>BELI DOWN</strong> (jangan tekan tab Jual).
             </div>
           </div>
         )}
 
         {(hoveredMode === 'SELL' || (!hoveredMode && tradeMode === 'SELL')) && (
           <div className={`mt-1.5 p-2 rounded-lg border text-[11px] font-mono transition-all ${
-            isDark ? 'bg-[#131722] border-amber-500/40' : 'bg-amber-50/70 border-amber-500/30'
+            isDark ? 'bg-[#291b10] border-amber-500/40' : 'bg-amber-50 border-amber-300 text-slate-900'
           }`}>
-            <div className="flex items-center space-x-1.5 text-amber-500 font-bold text-[10px] mb-1">
+            <div className={`flex items-center space-x-1.5 font-bold text-[10px] mb-1 ${
+              isDark ? 'text-amber-400' : 'text-amber-900'
+            }`}>
               <CornerDownRight className="w-3.5 h-3.5" />
               <span>PANDUAN EXIT (LEPAS POSISI):</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'UP' && tradeMode === 'SELL' ? 'bg-amber-500/25 border-amber-500 text-white font-bold' : 'border-slate-800 text-[#787b86]'
+                outcome === 'UP' && tradeMode === 'SELL'
+                  ? isDark
+                    ? 'bg-amber-500/25 border-amber-500 text-white font-bold'
+                    : 'bg-amber-100 border-amber-500 text-amber-950 font-black'
+                  : isDark
+                  ? 'border-[#2a2e39] text-[#787b86]'
+                  : 'bg-white border-slate-200 text-slate-600'
               }`}>
-                <span className="text-amber-500 font-black">↳ 🟠</span>
+                <span className={isDark ? 'text-amber-400 font-black' : 'text-amber-700 font-black'}>↳ 🟠</span>
                 <span className="truncate"><strong>JUAL UP</strong> (Tutup Saham Up)</span>
               </div>
               <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'DOWN' && tradeMode === 'SELL' ? 'bg-orange-500/25 border-orange-500 text-white font-bold' : 'border-slate-800 text-[#787b86]'
+                outcome === 'DOWN' && tradeMode === 'SELL'
+                  ? isDark
+                    ? 'bg-orange-500/25 border-orange-500 text-white font-bold'
+                    : 'bg-orange-100 border-orange-500 text-orange-950 font-black'
+                  : isDark
+                  ? 'border-[#2a2e39] text-[#787b86]'
+                  : 'bg-white border-slate-200 text-slate-600'
               }`}>
-                <span className="text-orange-500 font-black">↳ 🟠</span>
+                <span className={isDark ? 'text-orange-400 font-black' : 'text-orange-700 font-black'}>↳ 🟠</span>
                 <span className="truncate"><strong>JUAL DOWN</strong> (Tutup Saham Down)</span>
               </div>
             </div>
-            <div className="text-[9.5px] text-amber-300 mt-1 font-sans italic text-center">
+            <div className={`text-[9.5px] mt-1 font-sans italic text-center ${
+              isDark ? 'text-amber-300' : 'text-amber-900 font-semibold'
+            }`}>
               ℹ️ Tab JUAL hanya dipakai untuk melepas saham yang sedang Anda miliki (Take Profit / Cut Loss).
             </div>
           </div>
@@ -776,28 +844,28 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             {/* Right Column: Financial Calculations */}
             <div className={`p-2.5 rounded-lg border flex flex-col justify-between text-[10px] space-y-1 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between">
-                <span className="text-[#787b86]">Harga Beli (Ask):</span>
-                <span className="font-bold text-white">{contractPriceCents}¢ (${contractPriceUsd.toFixed(3)})</span>
+                <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>Harga Beli (Ask):</span>
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{contractPriceCents}¢ (${contractPriceUsd.toFixed(3)})</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-[#787b86]">Jumlah Kontrak:</span>
-                <span className="font-black text-[#f0b90b]">{buyShares} Lembar</span>
+                <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>Jumlah Kontrak:</span>
+                <span className={`font-black ${isDark ? 'text-[#f0b90b]' : 'text-amber-700'}`}>{buyShares} Lembar</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-[#787b86]">Total Biaya (+Fee):</span>
-                <span>${buyCost.toFixed(2)} (<span className="text-[#787b86]">${buyFee} fee</span>)</span>
+                <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>Total Biaya (+Fee):</span>
+                <span className={isDark ? 'text-white' : 'text-slate-900'}>${buyCost.toFixed(2)} (<span className={isDark ? 'text-[#787b86]' : 'text-slate-500'}>${buyFee} fee</span>)</span>
               </div>
 
-              <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
-                <span className="text-[#787b86]">Potensi Payout:</span>
-                <span className="font-bold text-white">${buyPayout.toFixed(2)}</span>
+              <div className={`flex items-center justify-between pt-1 border-t ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>Potensi Payout:</span>
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>${buyPayout.toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-[#089981] font-bold">Potensi Profit Bersih:</span>
-                <span className="font-black text-[#089981]">+${buyProfit.toFixed(2)} (+{buyRoiPct}%)</span>
+                <span className={`${isDark ? 'text-[#089981]' : 'text-emerald-700'} font-bold`}>Potensi Profit Bersih:</span>
+                <span className={`font-black ${isDark ? 'text-[#089981]' : 'text-emerald-700'}`}>+${buyProfit.toFixed(2)} (+{buyRoiPct}%)</span>
               </div>
             </div>
           </div>
@@ -872,7 +940,9 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
           <div
             className={`px-3 py-1.5 rounded-lg border flex items-center justify-between text-xs font-mono ${
               heldShares > 0
-                ? 'bg-amber-950/40 border-amber-500/60 text-amber-200'
+                ? isDark
+                  ? 'bg-amber-950/40 border-amber-500/60 text-amber-200'
+                  : 'bg-amber-50 border-amber-300 text-amber-950'
                 : isDark
                 ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86]'
                 : 'bg-slate-100 border-slate-300 text-slate-500'
@@ -884,10 +954,10 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             </div>
             <div>
               {heldShares > 0 ? (
-                <span className="font-black text-white text-xs">
+                <span className={`font-black text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {heldShares.toFixed(2)} Lembar (~${(heldShares * contractPriceUsd).toFixed(2)})
                   {avgBuyPrice > 0 && (
-                    <span className="text-amber-300 text-[10px] ml-1.5 font-normal">
+                    <span className={`text-[10px] ml-1.5 font-normal ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
                       (Beli @ {(avgBuyPrice * 100).toFixed(1)}¢)
                     </span>
                   )}
@@ -950,12 +1020,12 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             <div className={`p-2.5 rounded-lg border flex flex-col justify-between text-[10px] space-y-1 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between">
                 <span className="text-[#787b86]">Harga Jual (Bid):</span>
-                <span className="font-bold text-white">{contractPriceCents}¢ (${contractPriceUsd.toFixed(3)})</span>
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{contractPriceCents}¢ (${contractPriceUsd.toFixed(3)})</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-[#787b86]">Kontrak Dijual:</span>
-                <span className="font-black text-amber-400">{parsedSellShares} Lembar</span>
+                <span className={`font-black ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{parsedSellShares} Lembar</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -963,17 +1033,17 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                 <span className="text-[#787b86]">-${sellFee.toFixed(3)}</span>
               </div>
 
-              <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
-                <span className="text-emerald-400 font-bold">Kas Masuk ke Saldo:</span>
-                <span className="font-black text-emerald-400 text-xs">+${sellNetProceeds.toFixed(2)} USDC.e</span>
+              <div className={`flex items-center justify-between pt-1 border-t ${isDark ? 'border-[#2a2e39]' : 'border-slate-200'}`}>
+                <span className={`${isDark ? 'text-emerald-400' : 'text-emerald-700'} font-bold`}>Kas Masuk ke Saldo:</span>
+                <span className={`font-black text-xs ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>+${sellNetProceeds.toFixed(2)} USDC.e</span>
               </div>
 
               {sellPnlEstimate !== null && (
                 <div className="flex items-center justify-between">
-                  <span className={sellPnlEstimate >= 0 ? 'text-[#089981]' : 'text-[#f23645]'}>
+                  <span className={sellPnlEstimate >= 0 ? (isDark ? 'text-[#089981]' : 'text-emerald-700') : (isDark ? 'text-[#f23645]' : 'text-rose-700')}>
                     Est. Realized PnL:
                   </span>
-                  <span className={`font-black ${sellPnlEstimate >= 0 ? 'text-[#089981]' : 'text-[#f23645]'}`}>
+                  <span className={`font-black ${sellPnlEstimate >= 0 ? (isDark ? 'text-[#089981]' : 'text-emerald-700') : (isDark ? 'text-[#f23645]' : 'text-rose-700')}`}>
                     {sellPnlEstimate >= 0 ? `+$${sellPnlEstimate.toFixed(2)}` : `-$${Math.abs(sellPnlEstimate).toFixed(2)}`}
                   </span>
                 </div>
