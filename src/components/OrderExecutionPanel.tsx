@@ -327,21 +327,21 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
       )}
 
       {/* Panel Header & Saldo */}
-      <div className={`flex items-center justify-between pb-2 border-b mb-2.5 ${isDark ? 'border-[#2a2e39]' : 'border-slate-200'}`}>
+      <div className={`flex items-center justify-between pb-1.5 border-b mb-2 ${isDark ? 'border-[#2a2e39]' : 'border-slate-200'}`}>
         <div className="flex items-center space-x-2 font-black text-xs uppercase tracking-wide">
-          <Zap className="w-4 h-4 text-[#f0b90b]" />
+          <Zap className="w-3.5 h-3.5 text-[#f0b90b]" />
           <span className={isDark ? 'text-white' : 'text-slate-900'}>PANEL TRADING INSTAN</span>
         </div>
         {/* Live Saldo & Status */}
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-1">
-            <span className={`w-2 h-2 rounded-full ${sidecarConnected ? 'bg-[#089981] animate-pulse' : 'bg-[#f23645]'}`} />
-            <span className={`text-[10px] font-bold ${sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}`}>
+            <span className={`w-2 h-2 rounded-full ${sidecarConnected ? 'bg-[#00e676] animate-pulse shadow-[0_0_8px_#00e676]' : 'bg-[#ff1744]'}`} />
+            <span className={`text-[10px] font-bold ${sidecarConnected ? (hasCredentials ? 'text-[#00e676]' : 'text-amber-400') : 'text-[#ff1744]'}`}>
               {sidecarConnected ? (hasCredentials ? 'READY' : 'NO KEYS') : 'OFFLINE'}
             </span>
           </div>
           {usdcBalance !== null && (
-            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-950/50 border border-[#089981]/50 text-[#089981]">
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-[#00e676]/50 text-[#00e676]">
               <span className="text-[10px] font-bold text-[#787b86]">SALDO:</span>
               <strong className="text-xs font-mono text-white font-black">${usdcBalance.toFixed(2)}</strong>
             </div>
@@ -349,42 +349,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         </div>
       </div>
 
-      {/* 0. Multi-Period Upcoming Markets Selector (Sesuai Data Polymarket) */}
-      {upcomingPeriods && upcomingPeriods.length > 0 && onSelectPeriod && (
-        <div className="mb-2.5 space-y-1">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#787b86]">
-            <span className="flex items-center space-x-1 font-bold">
-              <Clock className="w-3 h-3 text-[#f0b90b]" />
-              <span>PERIODE PASAR POLYMARKET:</span>
-            </span>
-            <span className="text-[9px] text-[#089981] font-bold">SINKRON RESMI</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 select-none">
-            {upcomingPeriods.map((p) => {
-              const isSelected = selectedWindowTs ? selectedWindowTs === p.windowTs : p.isCurrent;
-              return (
-                <button
-                  key={p.windowTs}
-                  onClick={() => onSelectPeriod(p.windowTs)}
-                  className={`px-1.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold flex flex-col items-center justify-center transition-all ${
-                    isSelected
-                      ? 'bg-[#f0b90b] text-slate-950 border-[#f0b90b] shadow-[0_0_10px_rgba(240,185,11,0.4)] font-black ring-1 ring-[#f0b90b]'
-                      : isDark
-                      ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white hover:border-slate-600'
-                      : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-black'
-                  }`}
-                  title={`Klik untuk memantau & beli periode ${p.label}`}
-                >
-                  <span className="truncate w-full text-center">{p.isCurrent ? '🟢 AKTIF' : p.label.split(' ')[0]}</span>
-                  <span className="text-[9px] opacity-80">{p.label.includes('(') ? p.label.split('(')[1].replace(')', '') : ''}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 1. KOTAK ODDS UP & DOWN (Relokasi dari Atas Chart ke Atas Menu BUY/SELL) */}
+      {/* 1. KOTAK NILAI UP & DOWN (WARNA KHUSUS CYBERPUNK GLOW) */}
       {(() => {
         const validUpPrice = Math.max(0.01, Math.min(0.99, isNaN(upPrice) ? 0.50 : upPrice));
         const validDownPrice = Math.max(0.01, Math.min(0.99, isNaN(downPrice) ? 0.50 : downPrice));
@@ -397,65 +362,148 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         const downPct = (validDownPrice * 100).toFixed(0);
 
         return (
-          <div className={`p-2 rounded-xl border mb-2.5 ${isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
-            <div className="grid grid-cols-2 gap-1.5 items-stretch">
-              {/* UP ODDS CARD */}
+          <div className={`p-2 rounded-xl border mb-2 shadow-lg transition-all ${
+            isDark
+              ? 'bg-gradient-to-b from-[#131722] via-[#0d1017] to-[#131722] border-[#2a2e39]'
+              : 'bg-gradient-to-b from-slate-50 to-slate-100 border-slate-300'
+          }`}>
+            <div className="grid grid-cols-2 gap-2 items-stretch">
+              
+              {/* === KOTAK NILAI UP (WARNA KHUSUS NEON EMERALD) === */}
               <div
-                className={`rounded-lg px-2.5 py-1.5 border transition-all flex items-center justify-between ${
-                  isUpWinning
-                    ? isDark
-                      ? 'bg-[radial-gradient(ellipse_at_right,_var(--tw-gradient-stops))] from-[#089981]/30 via-[#0d2b20] to-[#131722] border-[#089981] shadow-[0_0_12px_rgba(8,153,129,0.3)] ring-1 ring-[#089981]'
-                      : 'bg-emerald-50 border-[#089981] shadow-sm ring-1 ring-[#089981]'
-                    : isDark
-                    ? 'bg-[#1e222d]/60 border-[#2a2e39]'
-                    : 'bg-white border-slate-200'
+                onClick={() => setOutcome('UP')}
+                role="button"
+                tabIndex={0}
+                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none overflow-hidden group ${
+                  outcome === 'UP'
+                    ? 'ring-2 ring-[#00e676] ring-offset-1 ring-offset-black'
+                    : 'opacity-90 hover:opacity-100'
+                } ${
+                  isDark
+                    ? 'bg-gradient-to-br from-[#04281c] via-[#021d14] to-[#01120c] border-[#00e676] shadow-[0_0_18px_rgba(0,230,118,0.28)]'
+                    : 'bg-gradient-to-br from-emerald-100 via-emerald-50 to-white border-[#00b05b] shadow-md'
                 }`}
+                title="Klik untuk memilih beli/jual UP"
               >
-                <div>
-                  <div className="flex items-center space-x-1">
-                    <ArrowUpRight className="w-3.5 h-3.5 text-[#089981]" />
-                    <span className="text-[10px] font-mono font-black uppercase text-[#089981]">UP (NAIK)</span>
+                {/* Radial ambient background aura */}
+                <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#00e676]/20 rounded-full blur-xl pointer-events-none" />
+
+                {/* Top Row: Label & Leading Crown */}
+                <div className="flex items-center justify-between mb-1 relative z-10">
+                  <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-[#00e676]/20 border border-[#00e676]/50">
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#00ff88]" />
+                    <span className="text-[10px] font-mono font-black uppercase text-[#00ff88] tracking-wider">
+                      UP (NAIK)
+                    </span>
                   </div>
-                  <div className="text-[9px] font-mono text-[#787b86]">
-                    ROI: <strong className="text-[#089981]">+{upRoi.toFixed(0)}%</strong>
+                  {isUpWinning ? (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-[#00ff88] text-black shadow-[0_0_8px_#00ff88] animate-pulse">
+                      👑 MEMIMPIN
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono text-[#00e676]/80 font-bold">
+                      {upPct}%
+                    </span>
+                  )}
+                </div>
+
+                {/* Middle Row: Massive Radiant Price (Odds Cents) */}
+                <div className="flex items-baseline justify-between mt-1 relative z-10">
+                  <span className="text-[10px] text-[#787b86] font-bold">NILAI KONTRAK:</span>
+                  <div className="flex items-baseline space-x-0.5">
+                    <span className="text-2xl sm:text-3xl font-mono font-black text-[#00ff88] drop-shadow-[0_0_12px_rgba(0,255,136,0.65)]">
+                      {upCents}
+                    </span>
+                    <span className="text-sm font-bold text-[#00e676]">¢</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xl font-mono font-black text-[#089981]">{upCents}¢</span>
+
+                {/* Bottom Row: Projected ROI badge */}
+                <div className="flex items-center justify-between pt-1 mt-1 border-t border-[#00e676]/30 text-[9.5px] font-mono relative z-10">
+                  <span className="text-[#787b86]">ESTIMASI ROI:</span>
+                  <strong className="text-[#00ff88] font-black drop-shadow-[0_0_6px_rgba(0,255,136,0.5)]">
+                    +{upRoi.toFixed(0)}%
+                  </strong>
                 </div>
               </div>
 
-              {/* DOWN ODDS CARD */}
+              {/* === KOTAK NILAI DOWN (WARNA KHUSUS NEON CRIMSON/RUBY) === */}
               <div
-                className={`rounded-lg px-2.5 py-1.5 border transition-all flex items-center justify-between ${
-                  !isUpWinning
-                    ? isDark
-                      ? 'bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-[#f23645]/30 via-[#2e1219] to-[#131722] border-[#f23645] shadow-[0_0_12px_rgba(242,54,69,0.3)] ring-1 ring-[#f23645]'
-                      : 'bg-rose-50 border-[#f23645] shadow-sm ring-1 ring-[#f23645]'
-                    : isDark
-                    ? 'bg-[#1e222d]/60 border-[#2a2e39]'
-                    : 'bg-white border-slate-200'
+                onClick={() => setOutcome('DOWN')}
+                role="button"
+                tabIndex={0}
+                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none overflow-hidden group ${
+                  outcome === 'DOWN'
+                    ? 'ring-2 ring-[#ff1744] ring-offset-1 ring-offset-black'
+                    : 'opacity-90 hover:opacity-100'
+                } ${
+                  isDark
+                    ? 'bg-gradient-to-br from-[#380b15] via-[#26060e] to-[#160307] border-[#ff1744] shadow-[0_0_18px_rgba(255,23,68,0.28)]'
+                    : 'bg-gradient-to-br from-rose-100 via-rose-50 to-white border-[#d50000] shadow-md'
                 }`}
+                title="Klik untuk memilih beli/jual DOWN"
               >
-                <div>
-                  <div className="flex items-center space-x-1">
-                    <ArrowDownRight className="w-3.5 h-3.5 text-[#f23645]" />
-                    <span className="text-[10px] font-mono font-black uppercase text-[#f23645]">DOWN (TURUN)</span>
+                {/* Radial ambient background aura */}
+                <div className="absolute -top-6 -right-6 w-20 h-20 bg-[#ff1744]/20 rounded-full blur-xl pointer-events-none" />
+
+                {/* Top Row: Label & Leading Crown */}
+                <div className="flex items-center justify-between mb-1 relative z-10">
+                  <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-[#ff1744]/20 border border-[#ff1744]/50">
+                    <ArrowDownRight className="w-3.5 h-3.5 text-[#ff3b69]" />
+                    <span className="text-[10px] font-mono font-black uppercase text-[#ff3b69] tracking-wider">
+                      DOWN (TURUN)
+                    </span>
                   </div>
-                  <div className="text-[9px] font-mono text-[#787b86]">
-                    ROI: <strong className="text-[#f23645]">+{downRoi.toFixed(0)}%</strong>
+                  {!isUpWinning ? (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-[#ff3b69] text-white shadow-[0_0_8px_#ff3b69] animate-pulse">
+                      👑 MEMIMPIN
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono text-[#ff1744]/80 font-bold">
+                      {downPct}%
+                    </span>
+                  )}
+                </div>
+
+                {/* Middle Row: Massive Radiant Price (Odds Cents) */}
+                <div className="flex items-baseline justify-between mt-1 relative z-10">
+                  <span className="text-[10px] text-[#787b86] font-bold">NILAI KONTRAK:</span>
+                  <div className="flex items-baseline space-x-0.5">
+                    <span className="text-2xl sm:text-3xl font-mono font-black text-[#ff3b69] drop-shadow-[0_0_12px_rgba(255,59,105,0.65)]">
+                      {downCents}
+                    </span>
+                    <span className="text-sm font-bold text-[#ff1744]">¢</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xl font-mono font-black text-[#f23645]">{downCents}¢</span>
+
+                {/* Bottom Row: Projected ROI badge */}
+                <div className="flex items-center justify-between pt-1 mt-1 border-t border-[#ff1744]/30 text-[9.5px] font-mono relative z-10">
+                  <span className="text-[#787b86]">ESTIMASI ROI:</span>
+                  <strong className="text-[#ff3b69] font-black drop-shadow-[0_0_6px_rgba(255,59,105,0.5)]">
+                    +{downRoi.toFixed(0)}%
+                  </strong>
                 </div>
               </div>
+
             </div>
 
-            {/* Mini Energy Duel Bar */}
-            <div className="relative w-full h-1.5 rounded-full overflow-hidden flex bg-[#1e222d] mt-1.5">
-              <div className="h-full bg-gradient-to-r from-[#089981] to-[#00ff88]" style={{ width: `${upPct}%` }} />
-              <div className="h-full bg-gradient-to-l from-[#f23645] to-[#ff3b69]" style={{ width: `${downPct}%` }} />
+            {/* Neon Dual Energy Power Duel Bar */}
+            <div className="relative w-full h-2 rounded-full overflow-hidden flex bg-black/60 mt-2 p-0.5 border border-[#2a2e39]">
+              <div
+                className="h-full rounded-l-full bg-gradient-to-r from-[#00c853] to-[#00e676] shadow-[0_0_10px_rgba(0,230,118,0.7)] transition-all duration-300"
+                style={{ width: `${upPct}%` }}
+                title={`Kekuatan UP: ${upPct}%`}
+              />
+              <div
+                className="h-full rounded-r-full bg-gradient-to-l from-[#d50000] to-[#ff1744] shadow-[0_0_10px_rgba(255,23,68,0.7)] transition-all duration-300"
+                style={{ width: `${downPct}%` }}
+                title={`Kekuatan DOWN: ${downPct}%`}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[8.5px] font-mono text-[#787b86] mt-0.5 px-0.5">
+              <span className="text-[#00e676] font-bold">UP: {upPct}%</span>
+              <span className="text-[8px] uppercase tracking-wider text-[#787b86]">Kekuatan Pasar</span>
+              <span className="text-[#ff1744] font-bold">DOWN: {downPct}%</span>
             </div>
           </div>
         );
