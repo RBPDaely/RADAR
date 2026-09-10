@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RoundSettlementState, ThemeMode } from '../types/market';
-import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Zap } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface CompactOddsBarProps {
   upPrice: number;
