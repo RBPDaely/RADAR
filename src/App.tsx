@@ -5,6 +5,7 @@ import { ProTradingChart } from './components/ProTradingChart';
 import { ClobOrderBook } from './components/ClobOrderBook';
 import { LiveTradesTicker } from './components/LiveTradesTicker';
 import { TwapAnalyticsCard } from './components/TwapAnalyticsCard';
+import { UpcomingPeriodsBar } from './components/UpcomingPeriodsBar';
 import { OrderExecutionPanel } from './components/OrderExecutionPanel';
 import { CredentialModal } from './components/CredentialModal';
 import { getPolymarketSlug } from './services/polymarketFeed';
@@ -187,32 +188,10 @@ export function App() {
                 settlement={settlement}
               />
             </div>
-          </section>
 
-          {/* RIGHT / SECONDARY (42% width on desktop): Order Execution + TWAP + OrderBook/Tape */}
-          <section className={`lg:col-span-5 xl:col-span-5 2xl:col-span-5 flex flex-col h-full min-h-0 space-y-2 ${
-            mobileTab !== 'chart' ? 'flex' : 'hidden lg:flex'
-          }`}>
-            {/* Mobile-Only Tab Views */}
-            <div className="lg:hidden flex-1 flex flex-col space-y-2">
-              {mobileTab === 'trade' && (
-                <OrderExecutionPanel
-                  asset={asset}
-                  upPrice={upPrice}
-                  downPrice={downPrice}
-                  upTokenId={upTokenId}
-                  downTokenId={downTokenId}
-                  theme={theme}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
-                  settlement={settlement}
-                  selectedWindowTs={selectedWindowTs}
-                  upcomingPeriods={upcomingPeriods}
-                  onSelectPeriod={setSelectedWindowTs}
-                />
-              )}
-              {mobileTab === 'book' && <div className="h-[480px]"><ClobOrderBook orderBook={orderBook} theme={theme} /></div>}
-              {mobileTab === 'trades' && <div className="h-[480px]"><LiveTradesTicker trades={trades} theme={theme} /></div>}
-              {mobileTab === 'twap' && (
+            {/* DIPINDAHKAN KE BAWAH CHART: Chainlink TWAP Benchmark + Waktu Beberapa Periode Berikutnya */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-2 mt-2 flex-shrink-0">
+              <div className="xl:col-span-7 min-w-0">
                 <TwapAnalyticsCard
                   settlement={settlement}
                   eventData={activeEvent}
@@ -220,21 +199,68 @@ export function App() {
                   slug={slug}
                   theme={theme}
                 />
+              </div>
+              <div className="xl:col-span-5 min-w-0">
+                <UpcomingPeriodsBar
+                  upcomingPeriods={upcomingPeriods}
+                  selectedWindowTs={selectedWindowTs}
+                  onSelectPeriod={setSelectedWindowTs}
+                  theme={theme}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* RIGHT / SECONDARY (42% width on desktop): Order Execution + OrderBook/Tape */}
+          <section className={`lg:col-span-5 xl:col-span-5 2xl:col-span-5 flex flex-col h-full min-h-0 space-y-2 ${
+            mobileTab !== 'chart' ? 'flex' : 'hidden lg:flex'
+          }`}>
+            {/* Mobile-Only Tab Views */}
+            <div className="lg:hidden flex-1 flex flex-col space-y-2">
+              {mobileTab === 'trade' && (
+                <div className="space-y-2">
+                  <UpcomingPeriodsBar
+                    upcomingPeriods={upcomingPeriods}
+                    selectedWindowTs={selectedWindowTs}
+                    onSelectPeriod={setSelectedWindowTs}
+                    theme={theme}
+                  />
+                  <OrderExecutionPanel
+                    asset={asset}
+                    upPrice={upPrice}
+                    downPrice={downPrice}
+                    upTokenId={upTokenId}
+                    downTokenId={downTokenId}
+                    theme={theme}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    settlement={settlement}
+                  />
+                </div>
+              )}
+              {mobileTab === 'book' && <div className="h-[480px]"><ClobOrderBook orderBook={orderBook} theme={theme} /></div>}
+              {mobileTab === 'trades' && <div className="h-[480px]"><LiveTradesTicker trades={trades} theme={theme} /></div>}
+              {mobileTab === 'twap' && (
+                <div className="space-y-2">
+                  <TwapAnalyticsCard
+                    settlement={settlement}
+                    eventData={activeEvent}
+                    activeMarket={activeMarket}
+                    slug={slug}
+                    theme={theme}
+                  />
+                  <UpcomingPeriodsBar
+                    upcomingPeriods={upcomingPeriods}
+                    selectedWindowTs={selectedWindowTs}
+                    onSelectPeriod={setSelectedWindowTs}
+                    theme={theme}
+                  />
+                </div>
               )}
             </div>
 
-            {/* Desktop Structured View (Zero Scroll, Exact Fit to 1-Screen PC Viewport) */}
+            {/* Desktop Structured View (Zero Scroll, Direct Access to BUY & SELL Menu) */}
             <div className="hidden lg:flex flex-col h-full min-h-0 space-y-2">
-              {/* 1. Chainlink TWAP Settlement Card */}
-              <TwapAnalyticsCard
-                settlement={settlement}
-                eventData={activeEvent}
-                activeMarket={activeMarket}
-                slug={slug}
-                theme={theme}
-              />
-
-              {/* 2. Instant Order Execution Panel with Relocated Odds & Decision Tree */}
+              {/* 1. Instant Order Execution Panel (NAIK KE ATAS, TAMPIL UTUH TANPA SCROLL) */}
               <OrderExecutionPanel
                 asset={asset}
                 upPrice={upPrice}
@@ -244,12 +270,9 @@ export function App() {
                 theme={theme}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 settlement={settlement}
-                selectedWindowTs={selectedWindowTs}
-                upcomingPeriods={upcomingPeriods}
-                onSelectPeriod={setSelectedWindowTs}
               />
 
-              {/* 3. Tabbed Order Book & Live Trades Stream */}
+              {/* 2. Tabbed Order Book & Live Trades Stream */}
               <div className="flex-1 min-h-0 flex flex-col border rounded-xl overflow-hidden shadow-md">
                 {/* Book vs Tape Tab Switcher */}
                 <div
