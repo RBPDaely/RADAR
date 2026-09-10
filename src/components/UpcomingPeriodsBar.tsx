@@ -24,7 +24,7 @@ export const UpcomingPeriodsBar: React.FC<UpcomingPeriodsBarProps> = ({
   return (
     <div
       className={`border rounded-xl px-3 py-2 flex flex-col justify-between font-mono text-xs shadow-md select-none transition-colors h-full ${
-        isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-[#dbe0e7] text-slate-800'
+        isDark ? 'bg-[#181d28] border-[#2a2e39]' : 'bg-white border-slate-200 text-slate-800'
       }`}
     >
       {/* Header bar */}
@@ -49,10 +49,10 @@ export const UpcomingPeriodsBar: React.FC<UpcomingPeriodsBarProps> = ({
               onClick={() => onSelectPeriod(p.windowTs)}
               className={`h-full min-h-[38px] px-1.5 py-1 rounded-lg border text-[10px] font-mono font-bold flex flex-col items-center justify-center transition-all ${
                 isSelected
-                  ? 'bg-gradient-to-b from-[#f0b90b] to-[#d9a406] text-slate-950 border-[#f0b90b] shadow-[0_0_12px_rgba(240,185,11,0.45)] font-black ring-1 ring-[#f0b90b]'
+                  ? 'bg-gradient-to-b from-[#f0b90b] to-[#d9a406] text-slate-950 border-[#f0b90b] shadow-[0_0_10px_rgba(240,185,11,0.4)] font-black ring-1 ring-[#f0b90b]'
                   : isDark
-                  ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-white hover:border-slate-600 hover:bg-[#252a37]'
-                  : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-black hover:bg-slate-200'
+                  ? 'bg-[#1e222d] border-[#2a2e39] text-[#9598a1] hover:text-white hover:border-slate-600 hover:bg-[#252a37]'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:text-black hover:bg-slate-100'
               }`}
               title={`Pantau & beli periode pasar ${p.label}`}
             >
