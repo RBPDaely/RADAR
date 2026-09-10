@@ -103,3 +103,16 @@ export interface LatencyStats {
   binanceWsConnected: boolean;
   lastUpdateTimestamp: number;
 }
+
+export interface MarketPeriodInfo {
+  windowTs: number;
+  label: string;
+  isCurrent: boolean;
+  event: PolymarketEvent | null;
+  market: PolymarketMarket | null;
+  upTokenId: string;
+  downTokenId: string;
+  upPrice: number;
+  downPrice: number;
+  slug: string;
+}
