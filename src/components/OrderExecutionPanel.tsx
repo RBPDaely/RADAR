@@ -12,7 +12,6 @@ import {
   ArrowUpRight,
   Wallet,
   X,
-  CornerDownRight,
 } from 'lucide-react';
 
 interface OrderExecutionPanelProps {
@@ -40,7 +39,6 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
   settlement,
 }) => {
   const isDark = theme === 'dark';
-  const [hoveredMode, setHoveredMode] = useState<'BUY' | 'SELL' | null>(null);
 
   // Mode: BUY (Entry) or SELL (Exit / Take Profit / Cut Loss)
   const [tradeMode, setTradeMode] = useState<'BUY' | 'SELL'>('BUY');
@@ -358,19 +356,19 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         const downPct = (validDownPrice * 100).toFixed(0);
 
         return (
-          <div className={`p-2 rounded-xl border mb-2 transition-all ${
+          <div className={`p-1.5 rounded-lg border mb-1.5 transition-all ${
             isDark
               ? 'bg-[#141822] border-[#2a2e39]'
               : 'bg-slate-50 border-slate-200'
           }`}>
-            <div className="grid grid-cols-2 gap-2 items-stretch">
+            <div className="grid grid-cols-2 gap-1.5 items-stretch">
               
               {/* === KOTAK NILAI UP === */}
               <div
                 onClick={() => setOutcome('UP')}
                 role="button"
                 tabIndex={0}
-                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none ${
+                className={`relative rounded-lg p-2 border-2 transition-all cursor-pointer select-none ${
                   outcome === 'UP'
                     ? isDark
                       ? 'ring-2 ring-[#089981] ring-offset-1 ring-offset-[#141822]'
@@ -439,7 +437,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                 onClick={() => setOutcome('DOWN')}
                 role="button"
                 tabIndex={0}
-                className={`relative rounded-xl p-2.5 border-2 transition-all cursor-pointer select-none ${
+                className={`relative rounded-lg p-2 border-2 transition-all cursor-pointer select-none ${
                   outcome === 'DOWN'
                     ? isDark
                       ? 'ring-2 ring-[#f23645] ring-offset-1 ring-offset-[#141822]'
@@ -539,184 +537,110 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
         );
       })()}
 
-      {/* 2. MODE SELECTOR TABS DENGAN INTERACTIVE DECISION TREE ARROWS (MODEL 1) */}
-      <div className="mb-2.5">
+      {/* 2. MODE SELECTOR TABS (BELI VS JUAL SECARA KONTRAS & TEGAS) */}
+      <div className="mb-2">
         <div className="grid grid-cols-2 gap-2">
+          {/* TAB BELI: HIJAU EMERALD */}
           <button
             onClick={() => setTradeMode('BUY')}
-            onMouseEnter={() => setHoveredMode('BUY')}
-            onMouseLeave={() => setHoveredMode(null)}
-            className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+            className={`py-1.5 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-1.5 transition-all border ${
               tradeMode === 'BUY'
-                ? 'bg-[#089981] text-white border-[#089981] shadow-sm'
-                : hoveredMode === 'BUY'
-                ? 'bg-[#089981]/20 text-[#089981] border-[#089981]/60'
+                ? 'bg-[#089981] text-white border-[#089981] shadow-[0_0_12px_rgba(8,153,129,0.35)] ring-1 ring-emerald-400'
                 : isDark
-                ? 'bg-[#1e222d] border-[#2a2e39] text-[#9598a1] hover:text-white'
-                : 'bg-slate-100 border-slate-300 text-slate-700 hover:text-black'
+                ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-emerald-400 hover:border-emerald-500/40'
+                : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-emerald-700'
             }`}
           >
             <ArrowUpRight className="w-4 h-4" />
             <span>BELI (ENTRY POSISI)</span>
           </button>
 
+          {/* TAB JUAL: ORANGE TERANG */}
           <button
             onClick={() => setTradeMode('SELL')}
-            onMouseEnter={() => setHoveredMode('SELL')}
-            onMouseLeave={() => setHoveredMode(null)}
-            className={`py-2 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+            className={`py-1.5 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-1.5 transition-all border ${
               tradeMode === 'SELL'
-                ? 'bg-[#ea580c] text-white border-[#ea580c] shadow-sm'
-                : hoveredMode === 'SELL'
-                ? 'bg-[#ea580c]/20 text-[#ea580c] border-[#ea580c]/60'
+                ? 'bg-[#f97316] text-white border-[#f97316] shadow-[0_0_12px_rgba(249,115,22,0.35)] ring-1 ring-orange-400'
                 : isDark
-                ? 'bg-[#1e222d] border-[#2a2e39] text-[#9598a1] hover:text-amber-400'
-                : 'bg-slate-100 border-slate-300 text-slate-700 hover:text-amber-700'
+                ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-orange-400 hover:border-orange-500/40'
+                : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-orange-700'
             }`}
           >
             <ArrowDownRight className="w-4 h-4" />
-            <span>JUAL (TUTUP / TAKE PROFIT)</span>
+            <span>JUAL (TUTUP POSISI)</span>
           </button>
         </div>
 
-        {/* DECISION TREE BRANCHING ARROWS (Pohon Keputusan Visual agar Otak Tidak Keliru) */}
-        {(hoveredMode === 'BUY' || (!hoveredMode && tradeMode === 'BUY')) && (
-          <div className={`mt-1.5 p-2 rounded-lg border text-[11px] font-mono transition-all ${
-            isDark ? 'bg-[#142620] border-[#089981]/40' : 'bg-emerald-50 border-emerald-300 text-slate-900'
-          }`}>
-            <div className={`flex items-center space-x-1.5 font-bold text-[10px] mb-1 ${
-              isDark ? 'text-[#26a69a]' : 'text-emerald-800'
-            }`}>
-              <CornerDownRight className="w-3.5 h-3.5" />
-              <span>PANDUAN ENTRY (TEBAK HARGA):</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'UP' && tradeMode === 'BUY'
-                  ? isDark
-                    ? 'bg-[#089981]/30 border-[#089981] text-white font-bold'
-                    : 'bg-emerald-100 border-emerald-500 text-emerald-950 font-black'
-                  : isDark
-                  ? 'border-[#2a2e39] text-[#787b86]'
-                  : 'bg-white border-slate-200 text-slate-600'
-              }`}>
-                <span className={isDark ? 'text-[#26a69a] font-black' : 'text-emerald-700 font-black'}>↳ 🟢</span>
-                <span className="truncate"><strong>BELI UP</strong> (Tebak Naik)</span>
-              </div>
-              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'DOWN' && tradeMode === 'BUY'
-                  ? isDark
-                    ? 'bg-[#f23645]/30 border-[#f23645] text-white font-bold'
-                    : 'bg-rose-100 border-rose-500 text-rose-950 font-black'
-                  : isDark
-                  ? 'border-[#2a2e39] text-[#787b86]'
-                  : 'bg-white border-slate-200 text-slate-600'
-              }`}>
-                <span className={isDark ? 'text-[#f23645] font-black' : 'text-rose-700 font-black'}>↳ 🔴</span>
-                <span className="truncate"><strong>BELI DOWN</strong> (Tebak Turun)</span>
-              </div>
-            </div>
-            <div className={`text-[9.5px] mt-1 font-sans italic text-center ${
-              isDark ? 'text-amber-400/90' : 'text-amber-800 font-semibold'
-            }`}>
-              💡 Ingat: Jika Anda memprediksi harga TURUN, pilih <strong>BELI DOWN</strong> (jangan tekan tab Jual).
-            </div>
+        {/* MODE STATUS BADGE (MEMASTIKAN FOKUS TIDAK PECAH) */}
+        <div className={`mt-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-mono flex items-center justify-between transition-all ${
+          tradeMode === 'BUY'
+            ? isDark
+              ? 'bg-[#089981]/15 border-[#089981]/50 text-emerald-300'
+              : 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+            : isDark
+            ? 'bg-orange-950/40 border-orange-500/60 text-orange-200'
+            : 'bg-orange-50 border-orange-300 text-orange-950 font-bold'
+        }`}>
+          <div className="flex items-center space-x-1.5">
+            <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
+            <span className="font-black uppercase tracking-wider">
+              {tradeMode === 'BUY' ? 'MODE ENTRY (BELI KONTRAK BARU)' : 'MODE EXIT (JUAL / TUTUP POSISI SAHAM)'}
+            </span>
           </div>
-        )}
-
-        {(hoveredMode === 'SELL' || (!hoveredMode && tradeMode === 'SELL')) && (
-          <div className={`mt-1.5 p-2 rounded-lg border text-[11px] font-mono transition-all ${
-            isDark ? 'bg-[#291b10] border-amber-500/40' : 'bg-amber-50 border-amber-300 text-slate-900'
-          }`}>
-            <div className={`flex items-center space-x-1.5 font-bold text-[10px] mb-1 ${
-              isDark ? 'text-amber-400' : 'text-amber-900'
-            }`}>
-              <CornerDownRight className="w-3.5 h-3.5" />
-              <span>PANDUAN EXIT (LEPAS POSISI):</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'UP' && tradeMode === 'SELL'
-                  ? isDark
-                    ? 'bg-amber-500/25 border-amber-500 text-white font-bold'
-                    : 'bg-amber-100 border-amber-500 text-amber-950 font-black'
-                  : isDark
-                  ? 'border-[#2a2e39] text-[#787b86]'
-                  : 'bg-white border-slate-200 text-slate-600'
-              }`}>
-                <span className={isDark ? 'text-amber-400 font-black' : 'text-amber-700 font-black'}>↳ 🟠</span>
-                <span className="truncate"><strong>JUAL UP</strong> (Tutup Saham Up)</span>
-              </div>
-              <div className={`p-1.5 rounded flex items-center space-x-1 border ${
-                outcome === 'DOWN' && tradeMode === 'SELL'
-                  ? isDark
-                    ? 'bg-orange-500/25 border-orange-500 text-white font-bold'
-                    : 'bg-orange-100 border-orange-500 text-orange-950 font-black'
-                  : isDark
-                  ? 'border-[#2a2e39] text-[#787b86]'
-                  : 'bg-white border-slate-200 text-slate-600'
-              }`}>
-                <span className={isDark ? 'text-orange-400 font-black' : 'text-orange-700 font-black'}>↳ 🟠</span>
-                <span className="truncate"><strong>JUAL DOWN</strong> (Tutup Saham Down)</span>
-              </div>
-            </div>
-            <div className={`text-[9.5px] mt-1 font-sans italic text-center ${
-              isDark ? 'text-amber-300' : 'text-amber-900 font-semibold'
-            }`}>
-              ℹ️ Tab JUAL hanya dipakai untuk melepas saham yang sedang Anda miliki (Take Profit / Cut Loss).
-            </div>
-          </div>
-        )}
+          <span className="text-[9px] opacity-80 hidden sm:inline">
+            {tradeMode === 'BUY' ? 'Eksekusi order beli saham UP atau DOWN' : 'Tutup saham yang sedang dimiliki untuk ambil profit'}
+          </span>
+        </div>
       </div>
 
       {/* ========================================================================= */}
       {/* 1. JIKA MODE BELI: HANYA TAMPILKAN FITUR BUY SECARA LUAS & NYAMAN */}
       {tradeMode === 'BUY' && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {/* Outcome Selector (UP vs DOWN) */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => setOutcome('UP')}
-              className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+              className={`py-1.5 px-2.5 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'UP'
-                  ? 'bg-[#089981] text-white border-[#089981] shadow-md ring-1 ring-[#089981]'
+                  ? 'bg-[#089981] text-white border-[#089981] shadow-md ring-2 ring-[#089981] ring-offset-1 ring-offset-[#131722]'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-[#089981]'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-[#089981]'
               }`}
             >
-              <TrendingUp className="w-4 h-4" />
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
               <div className="flex flex-col text-left">
                 <span>BELI UP ({(upPrice * 100).toFixed(1)}¢)</span>
-                <span className="text-[9px] opacity-80 font-normal">🟢 TEBAK TREN NAIK</span>
+                <span className="text-[8.5px] opacity-85 font-normal">🟢 TEBAK TREN NAIK</span>
               </div>
             </button>
 
             <button
               onClick={() => setOutcome('DOWN')}
-              className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+              className={`py-1.5 px-2.5 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'DOWN'
-                  ? 'bg-[#f23645] text-white border-[#f23645] shadow-md ring-1 ring-[#f23645]'
+                  ? 'bg-[#f23645] text-white border-[#f23645] shadow-md ring-2 ring-[#f23645] ring-offset-1 ring-offset-[#131722]'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-[#f23645]'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-[#f23645]'
               }`}
             >
-              <TrendingDown className="w-4 h-4" />
+              <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
               <div className="flex flex-col text-left">
                 <span>BELI DOWN ({(downPrice * 100).toFixed(1)}¢)</span>
-                <span className="text-[9px] opacity-80 font-normal">🔴 TEBAK TREN TURUN</span>
+                <span className="text-[8.5px] opacity-85 font-normal">🔴 TEBAK TREN TURUN</span>
               </div>
             </button>
           </div>
 
           {/* 2-Column Balanced Body: Left = Inputs, Right = Calculations */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
             {/* Left Column: Order Type & Flexible Modal Inputs */}
-            <div className={`p-2.5 rounded-lg border space-y-2 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`p-2 rounded-lg border space-y-1.5 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[#787b86] font-bold">TIPE ORDER:</span>
-                <div className={`flex items-center p-0.5 rounded border text-[10px] ${isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-slate-300'}`}>
+                <span className="text-[9.5px] text-[#787b86] font-bold">TIPE ORDER:</span>
+                <div className={`flex items-center p-0.5 rounded border text-[9.5px] ${isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-white border-slate-300'}`}>
                   <button
                     onClick={() => setOrderType('MARKET')}
                     className={`px-2 py-0.5 rounded font-black transition-colors ${
@@ -737,7 +661,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
               </div>
 
               {orderType === 'LIMIT' && (
-                <div className="flex items-center justify-between p-1 rounded border border-[#f0b90b]/40 bg-[#f0b90b]/10 text-[10px]">
+                <div className="flex items-center justify-between p-1 rounded border border-[#f0b90b]/40 bg-[#f0b90b]/10 text-[9.5px]">
                   <span className="font-bold text-[#f0b90b]">HARGA LIMIT:</span>
                   <div className="flex items-center space-x-1">
                     <input
@@ -758,7 +682,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
 
               {/* Free Manual USD Input (Min $1) */}
               <div>
-                <div className="flex items-center justify-between text-[10px] text-[#787b86] font-bold mb-1">
+                <div className="flex items-center justify-between text-[9.5px] text-[#787b86] font-bold mb-1">
                   <span>MODAL BELI (MIN $1):</span>
                   <div className="flex items-center space-x-1">
                     <div className="relative flex items-center">
@@ -770,7 +694,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                         placeholder="1.00"
                         value={amountUsdInput}
                         onChange={(e) => setAmountUsdInput(e.target.value)}
-                        className={`w-24 pl-5 pr-2 py-1 text-right font-black rounded-md border text-xs focus:ring-1 focus:ring-[#f0b90b] outline-none ${
+                        className={`w-24 pl-5 pr-2 py-0.5 text-right font-black rounded-md border text-xs focus:ring-1 focus:ring-[#f0b90b] outline-none ${
                           isDark ? 'bg-[#131722] border-[#2a2e39] text-white' : 'bg-white border-slate-300 text-slate-900'
                         }`}
                       />
@@ -784,7 +708,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                     <button
                       key={p}
                       onClick={() => setAmountUsdInput(p.toString())}
-                      className={`py-1 rounded font-black text-[10px] border transition-all ${
+                      className={`py-0.5 rounded font-black text-[9.5px] border transition-all ${
                         parseFloat(amountUsdInput) === p
                           ? 'bg-[#f0b90b] text-black border-[#f0b90b]'
                           : isDark
@@ -802,7 +726,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                         setAmountUsdInput(Math.floor(usdcBalance * 100) / 100 + '');
                       }
                     }}
-                    className={`py-1 rounded font-black text-[9px] border transition-all ${
+                    className={`py-0.5 rounded font-black text-[9px] border transition-all ${
                       isDark
                         ? 'bg-[#131722] border-[#089981]/50 text-[#089981] hover:bg-[#089981]/20'
                         : 'bg-emerald-50 border-[#089981]/40 text-[#089981] hover:bg-emerald-100'
@@ -814,10 +738,10 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
 
                 {/* Quick Add Buttons (+1, +5) */}
                 <div className="flex items-center space-x-1 justify-end pt-0.5">
-                  <span className="text-[8px] text-[#787b86] mr-1">Tambah cepat:</span>
+                  <span className="text-[8px] text-[#787b86] mr-1">Tambah:</span>
                   <button
                     onClick={() => handleAddAmount(1)}
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                    className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold border ${
                       isDark ? 'bg-[#131722] border-slate-700 hover:text-white' : 'bg-white border-slate-300 hover:bg-slate-100'
                     }`}
                   >
@@ -825,7 +749,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                   </button>
                   <button
                     onClick={() => handleAddAmount(5)}
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                    className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold border ${
                       isDark ? 'bg-[#131722] border-slate-700 hover:text-white' : 'bg-white border-slate-300 hover:bg-slate-100'
                     }`}
                   >
@@ -836,7 +760,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             </div>
 
             {/* Right Column: Financial Calculations */}
-            <div className={`p-2.5 rounded-lg border flex flex-col justify-between text-[10px] space-y-1 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`p-2 rounded-lg border flex flex-col justify-between text-[9.5px] space-y-1 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between">
                 <span className={isDark ? 'text-[#787b86]' : 'text-slate-600'}>Harga Beli (Ask):</span>
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{contractPriceCents}¢ (${contractPriceUsd.toFixed(3)})</span>
@@ -858,7 +782,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className={`${isDark ? 'text-[#089981]' : 'text-emerald-700'} font-bold`}>Potensi Profit Bersih:</span>
+                <span className={`${isDark ? 'text-[#089981]' : 'text-emerald-700'} font-bold`}>Potensi Profit:</span>
                 <span className={`font-black ${isDark ? 'text-[#089981]' : 'text-emerald-700'}`}>+${buyProfit.toFixed(2)} (+{buyRoiPct}%)</span>
               </div>
             </div>
@@ -868,10 +792,10 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
           <button
             onClick={handleExecute}
             disabled={isExecuting || !sidecarConnected}
-            className={`w-full py-3 rounded-lg font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-lg ${
+            className={`w-full py-2.5 rounded-lg font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md ${
               outcome === 'UP'
-                ? 'bg-[#089981] hover:bg-[#0aa88f] text-white shadow-[0_0_15px_rgba(8,153,129,0.4)] disabled:opacity-50'
-                : 'bg-[#f23645] hover:bg-[#ff3b4b] text-white shadow-[0_0_15px_rgba(242,54,69,0.4)] disabled:opacity-50'
+                ? 'bg-[#089981] hover:bg-[#0aa88f] text-white shadow-[0_0_12px_rgba(8,153,129,0.35)] disabled:opacity-50'
+                : 'bg-[#f23645] hover:bg-[#ff3b4b] text-white shadow-[0_0_12px_rgba(242,54,69,0.35)] disabled:opacity-50'
             }`}
           >
             {isExecuting ? (
@@ -892,47 +816,47 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
       {/* 2. JIKA MODE JUAL: HANYA TAMPILKAN FITUR SELL SECARA LUAS & NYAMAN */}
       {/* ========================================================================= */}
       {tradeMode === 'SELL' && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {/* Outcome Selector (JUAL UP vs JUAL DOWN) */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => setOutcome('UP')}
-              className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+              className={`py-1.5 px-2.5 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'UP'
-                  ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-1 ring-amber-400'
+                  ? 'bg-amber-600 text-white border-amber-500 shadow-md ring-2 ring-amber-400 ring-offset-1 ring-offset-[#131722]'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-amber-400'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-amber-600'
               }`}
             >
-              <TrendingUp className="w-4 h-4" />
+              <TrendingUp className="w-3.5 h-3.5" />
               <div className="flex flex-col text-left">
                 <span>JUAL UP ({(upPrice * 100).toFixed(1)}¢)</span>
-                <span className="text-[9px] opacity-80 font-normal">🟠 TUTUP SAHAM UP</span>
+                <span className="text-[8.5px] opacity-85 font-normal">🟠 TUTUP SAHAM UP</span>
               </div>
             </button>
 
             <button
               onClick={() => setOutcome('DOWN')}
-              className={`py-2 px-3 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
+              className={`py-1.5 px-2.5 rounded-lg font-black text-xs flex items-center justify-center space-x-2 transition-all border ${
                 outcome === 'DOWN'
-                  ? 'bg-orange-600 text-white border-orange-500 shadow-md ring-1 ring-orange-400'
+                  ? 'bg-orange-600 text-white border-orange-500 shadow-md ring-2 ring-orange-400 ring-offset-1 ring-offset-[#131722]'
                   : isDark
                   ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-orange-400'
                   : 'bg-slate-100 border-slate-300 text-slate-600 hover:text-orange-600'
               }`}
             >
-              <TrendingDown className="w-4 h-4" />
+              <TrendingDown className="w-3.5 h-3.5" />
               <div className="flex flex-col text-left">
                 <span>JUAL DOWN ({(downPrice * 100).toFixed(1)}¢)</span>
-                <span className="text-[9px] opacity-80 font-normal">🟠 TUTUP SAHAM DOWN</span>
+                <span className="text-[8.5px] opacity-85 font-normal">🟠 TUTUP SAHAM DOWN</span>
               </div>
             </button>
           </div>
 
           {/* Prominent Owned Position Banner */}
           <div
-            className={`px-3 py-1.5 rounded-lg border flex items-center justify-between text-xs font-mono ${
+            className={`px-2.5 py-1 rounded-lg border flex items-center justify-between text-xs font-mono ${
               heldShares > 0
                 ? isDark
                   ? 'bg-amber-950/40 border-amber-500/60 text-amber-200'
@@ -942,31 +866,31 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                 : 'bg-slate-100 border-slate-300 text-slate-500'
             }`}
           >
-            <div className="flex items-center space-x-2">
-              <Wallet className="w-4 h-4 text-[#f0b90b]" />
-              <span className="font-bold">POSISI TERBUKA ({outcome}):</span>
+            <div className="flex items-center space-x-1.5">
+              <Wallet className="w-3.5 h-3.5 text-[#f0b90b]" />
+              <span className="font-bold text-[10px]">POSISI ({outcome}):</span>
             </div>
             <div>
               {heldShares > 0 ? (
                 <span className={`font-black text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {heldShares.toFixed(2)} Lembar (~${(heldShares * contractPriceUsd).toFixed(2)})
                   {avgBuyPrice > 0 && (
-                    <span className={`text-[10px] ml-1.5 font-normal ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                    <span className={`text-[9.5px] ml-1 font-normal ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
                       (Beli @ {(avgBuyPrice * 100).toFixed(1)}¢)
                     </span>
                   )}
                 </span>
               ) : (
-                <span className="italic text-[11px]">0 Lembar (Belum ada posisi)</span>
+                <span className="italic text-[10px]">0 Lembar (Belum ada posisi)</span>
               )}
             </div>
           </div>
 
           {/* 2-Column Balanced Body: Left = Shares & Presets, Right = Cash Return */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
             {/* Left Column: Percentage Buttons & Quantity */}
-            <div className={`p-2.5 rounded-lg border space-y-2 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center justify-between text-[10px] text-[#787b86] font-bold">
+            <div className={`p-2 rounded-lg border space-y-1.5 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between text-[9.5px] text-[#787b86] font-bold">
                 <span>JUMLAH JUAL:</span>
                 <div className="flex items-center space-x-1">
                   <input
@@ -986,7 +910,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
 
               {/* Presets: 25%, 50%, 75%, 100% MAX */}
               <div>
-                <span className="text-[9px] text-[#787b86] font-bold uppercase block mb-1">
+                <span className="text-[8.5px] text-[#787b86] font-bold uppercase block mb-0.5">
                   TUTUP SEBAGIAN / SEMUA:
                 </span>
                 <div className="grid grid-cols-4 gap-1">
@@ -995,7 +919,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
                       key={pct}
                       onClick={() => handleSetSellPercentage(pct)}
                       disabled={heldShares <= 0}
-                      className={`py-1 rounded font-black text-[10px] border transition-all ${
+                      className={`py-0.5 rounded font-black text-[9.5px] border transition-all ${
                         heldShares > 0 && Math.abs(parsedSellShares - Math.floor((heldShares * (pct / 100)) * 100) / 100) < 0.05
                           ? 'bg-amber-600 text-white border-amber-500 shadow-sm'
                           : isDark
@@ -1011,7 +935,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
             </div>
 
             {/* Right Column: Financial Proceeds */}
-            <div className={`p-2.5 rounded-lg border flex flex-col justify-between text-[10px] space-y-1 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`p-2 rounded-lg border flex flex-col justify-between text-[9.5px] space-y-1 ${isDark ? 'bg-[#1e222d]/60 border-[#2a2e39]' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between">
                 <span className="text-[#787b86]">Harga Jual (Bid):</span>
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{contractPriceCents}¢ (${contractPriceUsd.toFixed(3)})</span>
@@ -1028,7 +952,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
               </div>
 
               <div className={`flex items-center justify-between pt-1 border-t ${isDark ? 'border-[#2a2e39]' : 'border-slate-200'}`}>
-                <span className={`${isDark ? 'text-emerald-400' : 'text-emerald-700'} font-bold`}>Kas Masuk ke Saldo:</span>
+                <span className={`${isDark ? 'text-emerald-400' : 'text-emerald-700'} font-bold`}>Kas Masuk:</span>
                 <span className={`font-black text-xs ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>+${sellNetProceeds.toFixed(2)} USDC.e</span>
               </div>
 
@@ -1049,7 +973,7 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
           <button
             onClick={handleExecute}
             disabled={isExecuting || !sidecarConnected || parsedSellShares <= 0}
-            className="w-full py-3 rounded-lg font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-[0_0_15px_rgba(234,88,12,0.4)] disabled:opacity-50"
+            className="w-full py-2.5 rounded-lg font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-[0_0_12px_rgba(234,88,12,0.35)] disabled:opacity-50"
           >
             {isExecuting ? (
               <>
