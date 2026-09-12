@@ -303,15 +303,24 @@ export function mergeCandles(existing: OHLCData[], incoming: OHLCData[], maxCoun
   return Array.from(map.values()).sort((a, b) => a.time - b.time).slice(-maxCount);
 }
 
-/**
- * Loads cached contract candles from localStorage.
- */
 export function loadCachedContractCandles(asset: CryptoAsset): OHLCData[] {
   try {
     const raw = localStorage.getItem(`${LOCAL_STORAGE_KEY_PREFIX}${asset}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Sanitize: only accept valid numbers within recent 2-hour window and strictly bounded [0.01, 0.99]
+        const valid = parsed.filter(
+          (c) =>
+            typeof c.time === 'number' &&
+            c.time > nowSec - 7200 &&
+            c.time <= nowSec + 60 &&
+            c.close >= 0.01 &&
+            c.close <= 0.99
+        );
+        if (valid.length >= 5) return valid;
+      }
     }
   } catch (e) {}
   return [];
