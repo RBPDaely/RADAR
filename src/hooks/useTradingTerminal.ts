@@ -15,9 +15,9 @@ import {
   MarketPeriodInfo,
 } from '../types/market';
 import {
-  BinanceStreamManager,
   fetchBinanceKlines,
 } from '../services/binanceFeed';
+import { MultiFeedStreamManager } from '../services/multiFeedManager';
 import {
   get5MinWindowTimestamp,
   getPolymarketSlug,
@@ -37,6 +37,7 @@ import {
   TwapEngine,
   aggregateCandles,
   resampleContractCandles,
+  synthesizeContractCandlesFromSpot,
   ensureStrictlyAscending,
   toHeikinAshi,
 } from '../services/twapEngine';
@@ -51,23 +52,6 @@ export function getTimeframeSeconds(tf: TimeFrame): number {
     case '15m': return 900;
     default: return 60;
   }
-}
-
-function generateBaselineContractCandles(basePrice: number, count: number = 60): OHLCData[] {
-  const p = basePrice > 0 && basePrice < 1 ? basePrice : 0.50;
-  const now = Math.floor(Date.now() / 60) * 60;
-  const candles: OHLCData[] = [];
-  for (let i = count; i >= 0; i--) {
-    candles.push({
-      time: now - (i * 60),
-      open: p,
-      high: Math.min(0.99, p + 0.005),
-      low: Math.max(0.01, p - 0.005),
-      close: p,
-      volume: 100,
-    });
-  }
-  return candles;
 }
 
 export function useTradingTerminal() {
@@ -123,10 +107,9 @@ export function useTradingTerminal() {
     }
   }, [theme]);
 
-  // Prediction Line (Proyeksi 30s) State
+  // Prediction Line State (RTP in SPOT, Fair Probability in CONTRACT)
   const [showPrediction, setShowPrediction] = useState<boolean>(true);
   const [predictedPrice, setPredictedPrice] = useState<number>(0);
-  const priceRollingQueueRef = useRef<Array<{ time: number; price: number }>>([]);
 
   // Market & Event State
   const [currentWindowTs, setCurrentWindowTs] = useState<number>(() => get5MinWindowTimestamp());
@@ -195,7 +178,7 @@ export function useTradingTerminal() {
 
   // Services Refs
   const twapEngineRef = useRef<TwapEngine>(new TwapEngine(currentWindowTs));
-  const binanceManagerRef = useRef<BinanceStreamManager | null>(null);
+  const multiFeedManagerRef = useRef<MultiFeedStreamManager | null>(null);
   const polyWsManagerRef = useRef<PolymarketClobWsManager | null>(null);
   const latestSpotRef = useRef<number>(0);
   const strikePriceRef = useRef<number>(0);
@@ -210,14 +193,19 @@ export function useTradingTerminal() {
     const isSpot = chartModeRef.current === 'SPOT';
     let source = isSpot ? spotActiveCandlesRef.current : contractActiveCandlesRef.current;
 
-    // In KONTRAK mode, if source is still empty, fallback to baseline candles
+    // In KONTRAK mode, if source is still empty, synthesize from spot klines
     if (!isSpot && source.length === 0) {
-      const base = contractBaseCandlesRef.current.length > 0
-        ? contractBaseCandlesRef.current
-        : generateBaselineContractCandles(0.50, 60);
-      contractBaseCandlesRef.current = base;
-      source = resampleContractCandles(base, timeframeRef.current, 250);
-      contractActiveCandlesRef.current = source;
+      if (spotActiveCandlesRef.current.length > 0) {
+        source = synthesizeContractCandlesFromSpot(
+          spotActiveCandlesRef.current,
+          currentWindowRef.current,
+          strikePriceRef.current,
+          upPriceRef.current,
+          timeframeRef.current,
+          250
+        );
+        contractActiveCandlesRef.current = source;
+      }
     }
 
     if (source.length === 0) {
@@ -245,7 +233,6 @@ export function useTradingTerminal() {
     spotActiveCandlesRef.current = [];
     contractBaseCandlesRef.current = [];
     contractActiveCandlesRef.current = [];
-    priceRollingQueueRef.current = [];
     setTwapLineData([]);
     setTrades([]);
     setOrderBook({
@@ -283,6 +270,13 @@ export function useTradingTerminal() {
         twapEngineRef.current.recordPrice(latestSpotRef.current, nowSec);
         const st = twapEngineRef.current.computeRoundSettlement(latestSpotRef.current, nowSec);
         setSettlement(st);
+
+        // Synchronize accurate projection for active chartMode
+        if (chartModeRef.current === 'SPOT') {
+          setPredictedPrice(st.requiredPriceToFlip > 0 ? st.requiredPriceToFlip : latestSpotRef.current);
+        } else {
+          setPredictedPrice(st.fairUpProbability || 0.50);
+        }
 
         if (nowSec >= windowFloor) {
           setTwapLineData((prev) => {
@@ -397,6 +391,19 @@ export function useTradingTerminal() {
 
       if (chartModeRef.current === 'SPOT') {
         emitCandles();
+      } else {
+        const synth = synthesizeContractCandlesFromSpot(
+          spotActiveCandlesRef.current,
+          currentWindowRef.current,
+          strikePriceRef.current,
+          upPriceRef.current,
+          timeframeRef.current,
+          250
+        );
+        if (synth.length > 0) {
+          contractActiveCandlesRef.current = synth;
+        }
+        emitCandles();
       }
     }
 
@@ -409,46 +416,39 @@ export function useTradingTerminal() {
 
   // 3. Re-aggregate KONTRAK candles on Timeframe or Mode change (100% bug-free)
   useEffect(() => {
-    let base = contractBaseCandlesRef.current;
-    if (base.length === 0) {
-      base = loadCachedContractCandles(asset);
-      if (base.length === 0) {
-        base = generateBaselineContractCandles(upPrice || 0.50, 60);
+    if (spotActiveCandlesRef.current.length > 0) {
+      const synth = synthesizeContractCandlesFromSpot(
+        spotActiveCandlesRef.current,
+        currentWindowRef.current,
+        strikePriceRef.current,
+        upPriceRef.current,
+        timeframe,
+        250
+      );
+      if (synth.length > 0) {
+        contractActiveCandlesRef.current = synth;
       }
-      contractBaseCandlesRef.current = ensureStrictlyAscending(base);
+    } else {
+      const cached = loadCachedContractCandles(asset);
+      if (cached.length > 0) {
+        contractActiveCandlesRef.current = resampleContractCandles(cached, timeframe, 250);
+      }
     }
 
-    contractActiveCandlesRef.current = resampleContractCandles(base, timeframe, 250);
     if (chartMode === 'CONTRACT') {
       emitCandles();
     }
   }, [timeframe, chartMode, asset, upPrice, emitCandles]);
 
-  // 4. Binance Live WebSocket Tick Pipeline
+  // 4. Multi-Feed Live WebSocket Tick Pipeline (Binance Primary + Coinbase Failover)
   useEffect(() => {
-    binanceManagerRef.current?.destroy();
+    multiFeedManagerRef.current?.destroy();
 
-    binanceManagerRef.current = new BinanceStreamManager(
+    multiFeedManagerRef.current = new MultiFeedStreamManager(
       asset,
       (tick) => {
         const prev = latestSpotRef.current;
         latestSpotRef.current = tick.price;
-
-        const nowMs = Date.now();
-        priceRollingQueueRef.current.push({ time: nowMs, price: tick.price });
-        priceRollingQueueRef.current = priceRollingQueueRef.current.filter((item) => nowMs - item.time <= 15000);
-
-        if (priceRollingQueueRef.current.length >= 2) {
-          const oldest = priceRollingQueueRef.current[0];
-          const dtSec = (nowMs - oldest.time) / 1000;
-          if (dtSec > 0.5) {
-            const velocity = (tick.price - oldest.price) / dtSec;
-            const projected = tick.price + (velocity * 30);
-            setPredictedPrice(projected);
-          }
-        } else {
-          setPredictedPrice(tick.price);
-        }
 
         const pSec = getTimeframeSeconds(timeframeRef.current);
         const bucketTime = Math.floor(tick.timeSec / pSec) * pSec;
@@ -491,26 +491,66 @@ export function useTradingTerminal() {
             setLatencyStats((prev) => ({
               ...prev,
               binanceWsPingMs: tick.latencyMs,
+              binanceWsConnected: true,
               lastUpdateTimestamp: Date.now(),
             }));
 
             if (chartModeRef.current === 'SPOT') {
+              emitCandles();
+            } else {
+              const curUp = upPriceRef.current > 0 && upPriceRef.current < 1
+                ? upPriceRef.current
+                : 0.50;
+              const pSec = getTimeframeSeconds(timeframeRef.current);
+              const bTime = Math.floor(tick.timeSec / pSec) * pSec;
+              const cArr = contractActiveCandlesRef.current;
+              if (cArr.length > 0) {
+                const last = cArr[cArr.length - 1];
+                if (last.time === bTime) {
+                  last.high = Math.max(last.high, curUp);
+                  last.low = Math.min(last.low, curUp);
+                  last.close = curUp;
+                  last.volume = (last.volume || 1) + 1;
+                } else if (bTime > last.time) {
+                  cArr.push({
+                    time: bTime,
+                    open: last.close,
+                    high: Math.max(last.close, curUp),
+                    low: Math.min(last.close, curUp),
+                    close: curUp,
+                    volume: 1,
+                  });
+                  if (cArr.length > 250) cArr.shift();
+                }
+              }
               emitCandles();
             }
             rafPendingRef.current = false;
           });
         }
       },
-      (connected) => {
-        setLatencyStats((prev) => ({ ...prev, binanceWsConnected: connected }));
+      (status) => {
+        setLatencyStats((prev) => ({
+          ...prev,
+          binanceWsConnected: status.connected,
+        }));
       }
     );
 
     return () => {
-      binanceManagerRef.current?.destroy();
-      binanceManagerRef.current = null;
+      multiFeedManagerRef.current?.destroy();
+      multiFeedManagerRef.current = null;
     };
   }, [asset, emitCandles]);
+
+  // 4b. Synchronize Prediction Line on Mode or Settlement Changes
+  useEffect(() => {
+    if (chartMode === 'SPOT') {
+      setPredictedPrice(settlement.requiredPriceToFlip > 0 ? settlement.requiredPriceToFlip : latestSpotRef.current);
+    } else {
+      setPredictedPrice(settlement.fairUpProbability !== undefined ? settlement.fairUpProbability : 0.50);
+    }
+  }, [chartMode, settlement.requiredPriceToFlip, settlement.fairUpProbability]);
 
   // 5. Contract Candle Tick Processor
   const processContractTick = useCallback((price: number, size: number, timestampSec: number, outcome: 'UP' | 'DOWN' = 'UP') => {
@@ -552,16 +592,16 @@ export function useTradingTerminal() {
     if (baseArr.length > 0) {
       const lastBase = baseArr[baseArr.length - 1];
       if (lastBase.time === base1mTime) {
-        lastBase.high = Math.max(lastBase.high, price);
-        lastBase.low = Math.min(lastBase.low, price);
-        lastBase.close = price;
+        lastBase.high = Math.max(lastBase.high, candlePrice);
+        lastBase.low = Math.min(lastBase.low, candlePrice);
+        lastBase.close = candlePrice;
         lastBase.volume += size;
       } else if (base1mTime > lastBase.time) {
-        baseArr.push({ time: base1mTime, open: price, high: price, low: price, close: price, volume: size });
+        baseArr.push({ time: base1mTime, open: candlePrice, high: candlePrice, low: candlePrice, close: candlePrice, volume: size });
         if (baseArr.length > 300) baseArr.shift();
       }
     } else {
-      baseArr.push({ time: base1mTime, open: price, high: price, low: price, close: price, volume: size });
+      baseArr.push({ time: base1mTime, open: candlePrice, high: candlePrice, low: candlePrice, close: candlePrice, volume: size });
     }
 
     saveCachedContractCandles(assetRef.current, baseArr);
