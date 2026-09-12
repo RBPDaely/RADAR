@@ -18,6 +18,8 @@ class ClobServiceManager {
   private signer: Wallet | null = null;
   private provider: ethers.JsonRpcProvider;
 
+  private initPromise: Promise<any> | null = null;
+
   constructor() {
     this.provider = new ethers.JsonRpcProvider(POLYGON_RPC_URL);
     this.initFromStorage();
@@ -26,7 +28,7 @@ class ClobServiceManager {
   public initFromStorage() {
     const creds = loadCredentials();
     if (creds && creds.signerPrivateKey) {
-      this.initClient(creds);
+      this.initPromise = this.initClient(creds);
     }
   }
 
@@ -49,7 +51,9 @@ class ClobServiceManager {
       // Auto-resolve real proxy/funder wallet from Polymarket profile API
       console.log(`[Sidecar] Resolving funder/proxy wallet for signer ${this.signer.address}...`);
       const autoFunder = await this.resolveProxyWallet(this.signer.address);
-      let funder = autoFunder || creds.funderAddress?.trim() || this.signer.address;
+      let funder = (creds.funderAddress?.trim() && creds.funderAddress.toLowerCase() !== this.signer.address.toLowerCase())
+        ? creds.funderAddress.trim()
+        : (autoFunder || creds.funderAddress?.trim() || this.signer.address);
       creds.funderAddress = funder;
       console.log(`[Sidecar] Target funder address: ${funder}`);
 
@@ -62,13 +66,15 @@ class ClobServiceManager {
         };
       }
 
-      // Try user signatureType or test POLY_PROXY / POLY_GNOSIS_SAFE
-      let chosenSigType: SignatureTypeV2 = creds.signatureType !== undefined ? (creds.signatureType as SignatureTypeV2) : SignatureTypeV2.POLY_PROXY;
-      if (funder.toLowerCase() === this.signer.address.toLowerCase() && creds.signatureType === undefined) {
+      // Determine initial signatureType preference (-1 or undefined means auto-detect)
+      let chosenSigType: SignatureTypeV2 = (creds.signatureType !== undefined && (creds.signatureType as number) >= 0)
+        ? (creds.signatureType as SignatureTypeV2)
+        : SignatureTypeV2.POLY_PROXY;
+      if (funder.toLowerCase() === this.signer.address.toLowerCase() && (creds.signatureType === undefined || (creds.signatureType as number) < 0)) {
         chosenSigType = SignatureTypeV2.EOA;
       }
 
-      // Initialize CLOB v2 client
+      // Initialize initial CLOB v2 client
       this.client = new ClobClient({
         host: 'https://clob.polymarket.com',
         chain: 137,
@@ -122,8 +128,18 @@ class ClobServiceManager {
         }
       }
 
-      // Auto-detect whether POLY_PROXY (1) or POLY_GNOSIS_SAFE (2) holds the balance
-      const sigTypesToTry = [chosenSigType, SignatureTypeV2.POLY_PROXY, SignatureTypeV2.POLY_GNOSIS_SAFE];
+      // Auto-detect whether POLY_PROXY (1), POLY_GNOSIS_SAFE (2), or EOA (0) holds the balance
+      const sigTypesToTry = Array.from(new Set([
+        chosenSigType,
+        SignatureTypeV2.POLY_PROXY,
+        SignatureTypeV2.POLY_GNOSIS_SAFE,
+        SignatureTypeV2.EOA
+      ]));
+
+      let bestClient: ClobClient | null = null;
+      let detectedSigType: SignatureTypeV2 = chosenSigType;
+      let maxBal = -1;
+
       for (const st of sigTypesToTry) {
         try {
           const candidateClient = new ClobClient({
@@ -138,16 +154,25 @@ class ClobServiceManager {
           const balRes = await candidateClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
           if (balRes && !(balRes as any).error) {
             const numBal = parseFloat(balRes.balance || '0');
-            console.log(`[Sidecar] Checked signatureType ${st}: balance = ${numBal / 1e6}`);
-            if (numBal > 0 || st === chosenSigType) {
-              this.client = candidateClient;
-              chosenSigType = st;
+            console.log(`[Sidecar] Probed signatureType ${st}: balance = ${numBal / 1e6}`);
+            if (numBal > maxBal) {
+              maxBal = numBal;
+              bestClient = candidateClient;
+              detectedSigType = st;
+            }
+            if (numBal > 0) {
+              console.log(`[Sidecar] Active balance found under signatureType ${st}!`);
               break;
             }
           }
         } catch (err) {
-          // continue
+          // continue probing other types
         }
+      }
+
+      if (bestClient) {
+        this.client = bestClient;
+        chosenSigType = detectedSigType;
       }
 
       creds.signatureType = chosenSigType;
@@ -163,6 +188,13 @@ class ClobServiceManager {
   }
 
   public async getWalletStatus(): Promise<WalletStatus> {
+    if (this.initPromise) {
+      try {
+        await this.initPromise;
+      } catch (e) {
+        // continue
+      }
+    }
     if (!this.currentCreds || !this.signer) {
       return { hasCredentials: false };
     }
@@ -201,19 +233,78 @@ class ClobServiceManager {
         }
       }
 
-      // 2. Secondary fallback: On-chain RPC balance
+      // 1b. Self-Healing: If CLOB balance is 0, probe alternative signature types (e.g. 1 vs 2 vs 0)
+      if (usdcBalance === 0 && this.signer && this.currentCreds) {
+        const curSig = this.currentCreds.signatureType ?? SignatureTypeV2.POLY_PROXY;
+        const alternatives = [
+          SignatureTypeV2.POLY_PROXY,
+          SignatureTypeV2.POLY_GNOSIS_SAFE,
+          SignatureTypeV2.EOA
+        ].filter(s => s !== curSig);
+
+        const apiCreds = (this.currentCreds.apiKey && this.currentCreds.apiSecret && this.currentCreds.apiPassphrase) ? {
+          key: this.currentCreds.apiKey.trim(),
+          secret: this.currentCreds.apiSecret.trim(),
+          passphrase: this.currentCreds.apiPassphrase.trim(),
+        } : undefined;
+
+        for (const altSt of alternatives) {
+          try {
+            const altClient = new ClobClient({
+              host: 'https://clob.polymarket.com',
+              chain: 137,
+              signer: this.signer as any,
+              creds: apiCreds,
+              signatureType: altSt,
+              funderAddress: funder,
+              throwOnError: true,
+            });
+            const altBal = await altClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
+            if (altBal && !altBal.error) {
+              const b = parseFloat(altBal.balance || '0') / 1e6;
+              if (b > 0) {
+                console.log(`[Sidecar] Self-healed: found balance $${b} under signatureType ${altSt} (was ${curSig})`);
+                this.client = altClient;
+                this.currentCreds.signatureType = altSt;
+                saveCredentials(this.currentCreds);
+                usdcBalance = b;
+                clobAuthValid = true;
+                if (altBal.allowances) {
+                  hasAllowance = Object.values(altBal.allowances).some((a: any) => {
+                    try { return BigInt(a) > 0n; } catch { return false; }
+                  });
+                }
+                break;
+              }
+            }
+          } catch (e) {
+            // continue
+          }
+        }
+      }
+
+      // 2. Secondary fallback: On-chain RPC balance (checks both USDC.e and Native USDC)
       if (usdcBalance === 0) {
         try {
-          const usdcContract = new ethers.Contract(USDC_E_POLYGON, ERC20_ABI, this.provider);
-          const bal = await usdcContract.balanceOf(funder);
-          const onchainBal = parseFloat(ethers.formatUnits(bal, 6));
-          if (onchainBal > 0) {
-            usdcBalance = onchainBal;
-          }
+          const USDC_NATIVE_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+          const tokens = [USDC_E_POLYGON, USDC_NATIVE_POLYGON];
+          const checkAddresses = Array.from(new Set([funder, signerAddr]));
 
-          if (!hasAllowance) {
-            const allow = await usdcContract.allowance(funder, CTF_EXCHANGE_POLYGON);
-            hasAllowance = allow > 0n;
+          for (const addr of checkAddresses) {
+            for (const tokenAddr of tokens) {
+              try {
+                const contract = new ethers.Contract(tokenAddr, ERC20_ABI, this.provider);
+                const bal = await contract.balanceOf(addr);
+                const onchainBal = parseFloat(ethers.formatUnits(bal, 6));
+                if (onchainBal > 0) {
+                  usdcBalance = Math.max(usdcBalance, onchainBal);
+                }
+                if (!hasAllowance) {
+                  const allow = await contract.allowance(addr, CTF_EXCHANGE_POLYGON);
+                  if (allow > 0n) hasAllowance = true;
+                }
+              } catch {}
+            }
           }
         } catch (rpcErr) {
           console.warn('[Sidecar] Polygon RPC check notice:', rpcErr);
