@@ -18,10 +18,6 @@ import {
   Activity,
   Layers,
   Zap,
-  ArrowUpRight,
-  ArrowDownRight,
-  TrendingUp,
-  TrendingDown,
 } from 'lucide-react';
 
 interface ProTradingChartProps {
@@ -125,43 +121,6 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
     }
   };
 
-  // Real-time tick change flash tracking for UP/DOWN values
-  const validUpPrice = Math.max(0.01, Math.min(0.99, isNaN(upPrice) ? 0.50 : upPrice));
-  const validDownPrice = Math.max(0.01, Math.min(0.99, isNaN(downPrice) ? 0.50 : downPrice));
-  const upCents = (validUpPrice * 100).toFixed(1);
-  const downCents = (validDownPrice * 100).toFixed(1);
-  const upRoi = ((1 / validUpPrice) - 1) * 100;
-  const downRoi = ((1 / validDownPrice) - 1) * 100;
-
-  const [upFlash, setUpFlash] = useState<'up' | 'down' | null>(null);
-  const [downFlash, setDownFlash] = useState<'up' | 'down' | null>(null);
-  const prevUpRef = useRef<number>(validUpPrice);
-  const prevDownRef = useRef<number>(validDownPrice);
-
-  useEffect(() => {
-    if (Math.abs(prevUpRef.current - validUpPrice) >= 0.001) {
-      const dir = validUpPrice > prevUpRef.current ? 'up' : 'down';
-      prevUpRef.current = validUpPrice;
-      setUpFlash(dir);
-      const timer = setTimeout(() => setUpFlash(null), 700);
-      return () => clearTimeout(timer);
-    }
-  }, [validUpPrice]);
-
-  useEffect(() => {
-    if (Math.abs(prevDownRef.current - validDownPrice) >= 0.001) {
-      const dir = validDownPrice > prevDownRef.current ? 'up' : 'down';
-      prevDownRef.current = validDownPrice;
-      setDownFlash(dir);
-      const timer = setTimeout(() => setDownFlash(null), 700);
-      return () => clearTimeout(timer);
-    }
-  }, [validDownPrice]);
-
-  const upPct = Math.round(validUpPrice * 100);
-  const downPct = 100 - upPct;
-  const { isUpWinning } = settlement;
-
   const TIMEFRAMES: Array<{ id: TimeFrame; label: string }> = [
     { id: '5s', label: '5s' },
     { id: '15s', label: '15s' },
@@ -216,10 +175,15 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
         borderColor: borderColor,
         autoScale: true,
         borderVisible: true,
-        scaleMargins: {
-          top: 0.08,
-          bottom: 0.2,
-        },
+        scaleMargins: isSpot
+          ? {
+              top: 0.08,
+              bottom: 0.2,
+            }
+          : {
+              top: 0.08,
+              bottom: 0.12,
+            },
         alignLabels: true,
       },
       timeScale: {
@@ -233,14 +197,14 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
       },
     });
 
-    // Add Volume Histogram Series
-    const topMargin = Math.max(0.4, 1 - (volScalePct / 100));
+    // Add Volume Histogram Series (Pure Overlay mode - NEVER touches right price scale)
+    const topMargin = Math.max(0.70, 1 - (volScalePct / 100));
     const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: isDark ? '#2a2e39' : '#cbd5e1',
+      color: isDark ? 'rgba(75, 85, 99, 0.35)' : 'rgba(203, 213, 225, 0.45)',
       priceFormat: { type: 'volume' },
-      priceScaleId: 'volume',
+      priceScaleId: '', // pure overlay
     });
-    chart.priceScale('volume').applyOptions({
+    volumeSeries.priceScale().applyOptions({
       scaleMargins: {
         top: topMargin,
         bottom: 0,
@@ -253,7 +217,10 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
       ? { type: 'price', precision: 2, minMove: 0.01 }
       : {
           type: 'custom',
-          formatter: (price: number) => `${(price * 100).toFixed(1)}¢`,
+          formatter: (price: number) => {
+            const clamped = Math.max(0.01, Math.min(0.99, Number(price) || 0.50));
+            return `${(clamped * 100).toFixed(1)}¢`;
+          },
         };
 
     // Add Main Price Series
@@ -354,9 +321,9 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
 
   // Volume scale update
   useEffect(() => {
-    if (chartRef.current) {
-      const topMargin = Math.max(0.4, 1 - (volScalePct / 100));
-      chartRef.current.priceScale('volume').applyOptions({
+    if (volumeSeriesRef.current) {
+      const topMargin = Math.max(0.70, 1 - (volScalePct / 100));
+      volumeSeriesRef.current.priceScale().applyOptions({
         scaleMargins: {
           top: topMargin,
           bottom: 0,
@@ -389,9 +356,27 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
     const cleanData = ensureStrictlyAscending(data);
     if (cleanData.length === 0) return;
 
+    // In CONTRACT mode, strictly clamp OHLC values to [0.01, 0.99] (1¢ to 99¢)
+    const sanitizedData =
+      chartMode === 'CONTRACT'
+        ? cleanData.map((d) => {
+            const o = Math.max(0.01, Math.min(0.99, Number(d.open) || 0.50));
+            const c = Math.max(0.01, Math.min(0.99, Number(d.close) || 0.50));
+            const rawH = Math.max(0.01, Math.min(0.99, Number(d.high) || Math.max(o, c)));
+            const rawL = Math.max(0.01, Math.min(0.99, Number(d.low) || Math.min(o, c)));
+            return {
+              ...d,
+              open: o,
+              high: Math.max(rawH, o, c),
+              low: Math.min(rawL, o, c),
+              close: c,
+            };
+          })
+        : cleanData;
+
     // Update Candles Series
     if (candleSeriesRef.current) {
-      const formatted = cleanData.map((d) => ({
+      const formatted = sanitizedData.map((d) => ({
         time: Math.floor(d.time) as any,
         open: d.open,
         high: d.high,
@@ -415,7 +400,7 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
 
     // Update Area Series
     if (areaSeriesRef.current) {
-      const formatted = cleanData.map((d) => ({
+      const formatted = sanitizedData.map((d) => ({
         time: Math.floor(d.time) as any,
         value: d.close,
       }));
@@ -436,7 +421,7 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
 
     // Update Volume Series
     if (volumeSeriesRef.current && showVolume) {
-      const volFormatted = cleanData.map((d) => ({
+      const volFormatted = sanitizedData.map((d) => ({
         time: Math.floor(d.time) as any,
         value: d.volume || 10,
         color: d.close >= d.open ? 'rgba(8, 153, 129, 0.45)' : 'rgba(242, 54, 69, 0.45)',
@@ -485,14 +470,18 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
             strikeLineRef.current.applyOptions({
               price: targetPrice,
               title: titleText,
+              color: isSpot ? '#f59e0b' : '#94a3b8',
+              lineWidth: 2,
+              lineStyle: 2,
+              axisLabelVisible: true,
             });
           } else {
             strikeLineRef.current = targetSeries.createPriceLine({
               price: targetPrice,
-              color: '#f0b90b',
-              lineWidth: 1,
+              color: isSpot ? '#f59e0b' : '#94a3b8',
+              lineWidth: 2,
               lineStyle: 2,
-              axisLabelVisible: false,
+              axisLabelVisible: true,
               title: titleText,
             });
           }
@@ -503,26 +492,33 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
       }
     }
 
-    // Optimized 30s Prediction Line (Mutation via applyOptions)
+    // Optimized Prediction / Flip Target Line (Mutation via applyOptions)
     if (targetSeries) {
       if (showPrediction && predictedPrice > 0) {
         const isSpot = chartMode === 'SPOT';
+        const targetPrice = isSpot
+          ? predictedPrice
+          : Math.max(0.01, Math.min(0.99, predictedPrice));
         const titleText = isSpot
-          ? `PROYEKSI $${predictedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-          : `PROYEKSI ${(predictedPrice * 100).toFixed(1)}¢`;
+          ? `FLIP $${targetPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : `PROYEKSI ${(targetPrice * 100).toFixed(1)}¢`;
 
         if (predictionLineRef.current) {
           predictionLineRef.current.applyOptions({
-            price: predictedPrice,
+            price: targetPrice,
             title: titleText,
+            color: '#06b6d4',
+            lineWidth: 2,
+            lineStyle: 3,
+            axisLabelVisible: true,
           });
         } else {
           predictionLineRef.current = targetSeries.createPriceLine({
-            price: predictedPrice,
-            color: '#38bdf8',
-            lineWidth: 1,
+            price: targetPrice,
+            color: '#06b6d4',
+            lineWidth: 2,
             lineStyle: 3,
-            axisLabelVisible: false,
+            axisLabelVisible: true,
             title: titleText,
           });
         }
@@ -565,6 +561,17 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
   const deltaFromBenchmark = activeCandle && effectiveBenchmark > 0 ? activeCandle.close - effectiveBenchmark : 0;
   const isAboveBenchmark = deltaFromBenchmark >= 0;
 
+  const {
+    secondsLeft = 300,
+    isUpWinning = true,
+    isCritical = false,
+    isUrgent = false,
+    progressPct = 0,
+  } = settlement || {};
+  const countdownMinutes = Math.floor(secondsLeft / 60);
+  const countdownSeconds = secondsLeft % 60;
+  const formattedCountdown = `${countdownMinutes.toString().padStart(2, '0')}:${countdownSeconds.toString().padStart(2, '0')}`;
+
   return (
     <div
       ref={chartWrapperRef}
@@ -574,7 +581,7 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
     >
       {/* 1. TOP TOOLBAR: Timeframe, Mode, Style, Feature Toggles, Manual Volume Scale */}
       <div
-        className={`flex flex-wrap items-center justify-between px-2.5 py-1.5 border-b gap-1.5 z-10 select-none flex-shrink-0 ${
+        className={`flex flex-wrap items-center justify-between px-2 py-1 border-b gap-1 z-10 select-none flex-shrink-0 ${
           isDark ? 'bg-[#131722] border-[#2a2e39]' : 'bg-[#fafafa] border-[#eaecef]'
         }`}
       >
@@ -685,19 +692,19 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
 
         {/* Right: Feature Toggles & Manual Volume Scale */}
         <div className="flex items-center space-x-1">
-          {/* Proyeksi 30s Toggle */}
+          {/* Proyeksi Flip/Target Toggle */}
           <button
             onClick={() => setShowPrediction(!showPrediction)}
             className={`flex items-center space-x-1 px-2.5 py-0.5 text-xs font-mono font-black rounded border transition-all ${
               showPrediction
-                ? 'bg-[#f0b90b]/20 text-[#f0b90b] border-[#f0b90b]/60 shadow-sm'
+                ? 'bg-[#06b6d4]/20 text-[#06b6d4] border-[#06b6d4]/60 shadow-sm'
                 : isDark
                 ? 'bg-[#1e222d] border-[#2a2e39] text-[#787b86] hover:text-[#d1d4dc]'
                 : 'bg-slate-100 border-slate-300 text-slate-500 hover:text-slate-800'
             }`}
-            title="Garis Proyeksi 30 Detik (Biru Langit)"
+            title="Garis Proyeksi Target Balik (Cyan #06b6d4)"
           >
-            <Zap className={`w-3 h-3 ${showPrediction ? 'animate-pulse text-[#f0b90b]' : ''}`} />
+            <Zap className={`w-3 h-3 ${showPrediction ? 'animate-pulse text-[#06b6d4]' : ''}`} />
             <span>PROYEKSI: {showPrediction ? 'ON' : 'OFF'}</span>
           </button>
 
@@ -822,7 +829,7 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
 
       {/* 3. FLOATING LEGENDA BILAH ATAS: OHLCV + Benchmark */}
       <div
-        className={`px-3 py-1 border-b flex flex-wrap items-center justify-between text-[11px] font-mono gap-1.5 select-none flex-shrink-0 ${
+        className={`px-2.5 py-0.5 border-b flex flex-wrap items-center justify-between text-[10.5px] font-mono gap-1 select-none flex-shrink-0 ${
           isDark ? 'bg-[#131722]/95 border-[#2a2e39]' : 'bg-[#f7f9fa]/95 border-[#eaecef]'
         }`}
       >
@@ -863,14 +870,15 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
           </div>
         )}
 
-        {/* Benchmark Reference */}
-        <div className="flex items-center space-x-3">
+        {/* Benchmark & Proyeksi Reference */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
           {isSpotMode ? (
             <>
               {strikePrice > 0 && (
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1" title="Benchmark Awal Ronde 5M">
+                  <span className="w-2 h-2 rounded-full bg-[#f59e0b]"></span>
                   <span className="text-[#787b86]">STRIKE:</span>
-                  <span className="font-bold text-[#f0b90b]">
+                  <span className="font-bold text-[#f59e0b]">
                     ${strikePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </span>
                   <span className={`text-[10px] font-black px-1 rounded ${
@@ -882,30 +890,105 @@ export const ProTradingChart: React.FC<ProTradingChartProps> = ({
               )}
 
               {runningTwap !== undefined && runningTwap > 0 && (
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1" title="Running Chainlink TWAP">
+                  <span className="w-2 h-2 rounded-full bg-[#a855f7]"></span>
                   <span className="text-[#c084fc] font-bold">TWAP:</span>
                   <span className="font-bold text-[#c084fc]">
                     ${runningTwap.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               )}
+
+              {showPrediction && predictedPrice > 0 && (
+                <div className="flex items-center space-x-1" title="Required Price to Flip (Target Balik)">
+                  <span className="w-2 h-2 rounded-full bg-[#06b6d4]"></span>
+                  <span className="text-[#06b6d4] font-bold">FLIP:</span>
+                  <span className="font-bold text-[#06b6d4]">
+                    ${predictedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
             </>
           ) : (
-            <div className="flex items-center space-x-1">
-              <span className="text-[#787b86]">PARITAS:</span>
-              <span className="font-bold text-[#f0b90b]">50.0¢</span>
-              <span className={`text-[10px] font-black px-1 rounded ${
-                isAboveBenchmark ? 'bg-[#089981]/20 text-[#089981]' : 'bg-[#f23645]/20 text-[#f23645]'
-              }`}>
-                {deltaFromBenchmark >= 0 ? '+' : ''}{(deltaFromBenchmark * 100).toFixed(1)}¢
-              </span>
-            </div>
+            <>
+              <div className="flex items-center space-x-1" title="Paritas 50¢">
+                <span className="w-2 h-2 rounded-full bg-[#94a3b8]"></span>
+                <span className="text-[#787b86]">PARITAS:</span>
+                <span className="font-bold text-[#94a3b8]">50.0¢</span>
+              </div>
+
+              {showPrediction && predictedPrice > 0 && (
+                <div className="flex items-center space-x-1" title="Fair Implied Probability">
+                  <span className="w-2 h-2 rounded-full bg-[#06b6d4]"></span>
+                  <span className="text-[#06b6d4] font-bold">PROYEKSI WAJAR:</span>
+                  <span className="font-bold text-[#06b6d4]">
+                    {(predictedPrice * 100).toFixed(1)}¢
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* 4. CANVAS GRAFIK UTAMA */}
-      <div ref={chartContainerRef} className="w-full flex-1 min-h-0 relative" />
+      {/* 4. CANVAS GRAFIK UTAMA DENGAN COUNTDOWN OVERLAY DI ATAS KOLOM HARGA */}
+      <div className="w-full flex-1 min-h-0 relative">
+        <div ref={chartContainerRef} className="w-full h-full" />
+
+        {/* COUNTDOWN OVERLAY DI DALAM CHART, DI ATAS KOLOM HARGA */}
+        <div className="absolute top-2 right-2 z-20 pointer-events-none select-none flex flex-col items-end space-y-1">
+          <div
+            className={`px-3 py-1 rounded-lg border shadow-xl backdrop-blur-md flex items-center space-x-2.5 transition-all ${
+              isCritical
+                ? 'bg-[#2e1219]/90 border-[#f23645] text-rose-200 animate-pulse'
+                : isUrgent
+                ? 'bg-[#382705]/90 border-[#f0b90b] text-amber-200'
+                : isDark
+                ? 'bg-[#181d28]/85 border-[#2a2e39] text-slate-200'
+                : 'bg-white/90 border-slate-300 text-slate-800'
+            }`}
+          >
+            <div className="flex flex-col items-end">
+              <span className="text-[8.5px] font-mono uppercase tracking-wider text-[#787b86] font-bold">
+                COUNTDOWN 5M
+              </span>
+              <span
+                className={`text-xl sm:text-2xl font-mono font-black tracking-widest leading-none ${
+                  isCritical ? 'text-[#f23645]' : isUrgent ? 'text-[#f0b90b]' : 'text-[#f0b90b]'
+                }`}
+              >
+                {formattedCountdown}
+              </span>
+            </div>
+
+            {/* Verdict Pill */}
+            <div className="flex flex-col items-end pl-2 border-l border-slate-700/40">
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono font-black uppercase tracking-wide border ${
+                  isUpWinning
+                    ? 'bg-[#089981]/25 text-[#089981] border-[#089981]/60'
+                    : 'bg-[#f23645]/25 text-[#f23645] border-[#f23645]/60'
+                }`}
+              >
+                {isUpWinning ? '▲ UP WIN' : '▼ DOWN WIN'}
+              </span>
+              <span className="text-[8px] font-mono text-[#787b86] mt-0.5 font-bold">
+                {secondsLeft}s
+              </span>
+            </div>
+          </div>
+
+          {/* Micro Progress Bar */}
+          <div className="w-full h-1 bg-black/40 rounded-full overflow-hidden border border-white/10">
+            <div
+              className={`h-full transition-all duration-1000 ${
+                isCritical ? 'bg-[#f23645]' : isUrgent ? 'bg-[#f0b90b]' : 'bg-[#089981]'
+              }`}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
