@@ -42,42 +42,84 @@ Terminal trading berlatensi rendah berstandar profesional untuk pasar **Polymark
 
 ---
 
-## Cara Menjalankan RADAR di Localhost
+## Panduan Cepat: Menjalankan RADAR pada Perangkat Baru
 
-Pastikan Anda telah memasang [Bun](https://bun.sh) (atau Node.js v18+):
+Gunakan langkah-langkah berikut ketika Anda mengkloning repositori ini ke komputer atau laptop baru:
 
+### 1. Buka Terminal Bash
+- Pada **Linux (Ubuntu / Linux Mint / Debian)**: Tekan kombinasi tombol `Ctrl` + `Alt` + `T` pada keyboard untuk membuka jendela terminal bash.
+- Pastikan shell aktif Anda adalah bash:
+  ```bash
+  bash
+  ```
+
+### 2. Pastikan Runtime Bun Terpasang
+RADAR menggunakan runtime performa tinggi [Bun](https://bun.sh). Jika perangkat Anda belum memiliki Bun, pasang cukup dengan 1 perintah:
 ```bash
-# 1. Jalankan Sidecar Trading Server (Terminal 1)
-bun run sidecar
-
-# 2. Jalankan Antarmuka Web Frontend (Terminal 2)
-bun run dev
+curl -fsSL https://bun.sh/install | bash
+```
+Setelah pemasangan selesai, muat konfigurasi environment Anda:
+```bash
+source ~/.bashrc
+```
+Periksa apakah Bun sudah aktif:
+```bash
+bun -v
 ```
 
-Buka peramban di `http://localhost:5173`.
+### 3. Kloning Repositori ke Perangkat Baru
+Salin repositori ini ke folder tujuan (misal di folder Dokumen atau Home):
+```bash
+git clone <URL_REPO_ANDA>
+cd RADAR
+```
+
+### 4. Jalankan Terminal RADAR (Cukup 1 Perintah)
+Cukup jalankan script launcher berikut di terminal:
+```bash
+bash start.sh
+```
+> **Catatan Cerdas**: Script `start.sh` sudah diprogram otomatis. Jika folder `node_modules` belum ada pada perangkat baru, script akan **otomatis menjalankan `bun install`**, lalu langsung menyalakan **Trading Sidecar Server (Port 3001)** dan **Web UI Dashboard (Port 5173)** secara bersamaan!
+
+### 5. Akses Terminal di Browser
+Buka peramban (Chrome / Brave / Firefox) dan buka URL:
+```
+http://localhost:5173
+```
+*(Tekan `Ctrl + C` di jendela terminal kapan saja untuk mematikan seluruh layanan).*
 
 ---
 
 ## Panduan Pengaturan Akun Polymarket (Email / Google)
 
-1. Buka antarmuka RADAR di `http://localhost:5173`.
+Agar RADAR dapat mendeteksi saldo dan mengeksekusi order dengan uang riil:
+
+1. Buka `http://localhost:5173` di browser Anda.
 2. Klik tombol **KREDENSIAL** di pojok kanan atas header.
 3. Masukkan data akun Polymarket Anda:
-   - **Funder Address**: Alamat dompet profil Polymarket Anda (Proxy Safe yang memegang saldo USDC.e).
-   - **Signer Private Key**: Kunci privat yang diekspor dari akun Polymarket (*Settings -> Reveal Private Key*).
-   - *API Key, Secret, Passphrase*: Boleh dikosongkan (server sidecar akan otomatis men-derive API key secara kriptografis).
-4. Klik **Simpan & Verifikasi**. Saldo USDC.e Anda akan langsung terdeteksi pada terminal.
+   - **Funder Address**: Alamat dompet profil Polymarket Anda (Proxy Safe yang memegang saldo USDC.e di Polygon). Dapat dilihat di profil Polymarket atau menu deposit.
+   - **Signer Private Key**: Kunci privat yang diekspor dari akun Polymarket (*Menu Profile -> Settings -> Reveal Private Key*).
+   - *API Key, Secret, Passphrase*: Boleh dikosongkan. Engine Sidecar lokal akan otomatis men-*derive* API key secara kriptografis dari private key Anda.
+4. Klik **Simpan & Verifikasi**. Saldo USDC.e Anda akan langsung terdeteksi seketika pada header terminal.
+
+> [!IMPORTANT]
+> Kredensial Anda disimpan secara eksklusif di berkas lokal perangkat Anda (`.radar_credentials.json` dengan izin terisolasi `0600`). File ini sudah masuk dalam `.gitignore` sehingga **TIDAK AKAN PERNAH** bocor atau terunggah ke repositori publik.
 
 ---
 
-## Menjalankan Pengujian (Testing)
+## Cheatsheet Perintah Terminal (Manual / Modular)
 
-```bash
-# Menjalankan unit test untuk TWAP Engine, Sanitasi Timestamp, dan Storage
-bun test
-```
+Jika Anda ingin menjalankan atau menguji komponen secara terpisah:
+
+| Perintah | Fungsi |
+| :--- | :--- |
+| `bash start.sh` | **Cara Utama (1-Click)**: Otomatis install dependensi + jalankan Sidecar dan Frontend. |
+| `bun run sidecar` | Menjalankan Trading Engine Sidecar (Port 3001) secara mandiri. |
+| `bun run dev` | Menjalankan antarmuka web Vite (Port 5173) secara mandiri. |
+| `bun run build` | Verifikasi tipe TypeScript (`tsc -b`) dan kompilasi produksi Vite. |
+| `bun run lint` | Menjalankan linter kilat dengan `oxlint`. |
 
 ---
 
-## Lisensi
-MIT License - Dibuat untuk ekosistem trading presisi tinggi Polymarket.
+## Lisensi & Keamanan
+MIT License - Dibuat untuk ekosistem trading presisi tinggi Polymarket. Seluruh modifikasi kode wajib melalui verifikasi ketat sebelum diterapkan ke repositori.
