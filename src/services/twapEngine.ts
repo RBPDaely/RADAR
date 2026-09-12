@@ -125,6 +125,89 @@ export function resampleContractCandles(candles: OHLCData[], tf: TimeFrame, maxC
 }
 
 /**
+ * Converts SPOT OHLC candles into continuous, high-fidelity KONTRAK (¢) candles.
+ * Driven by the TWAP settlement probability model and anchored to Polymarket CLOB market price.
+ * Guarantees every candle on 5s, 15s, 30s, 1m, 5m, 15m has authentic OHLC wicks and movement.
+ */
+export function synthesizeContractCandlesFromSpot(
+  spotCandles: OHLCData[],
+  currentWindowTs: number,
+  strikePrice: number,
+  currentMarketUpPrice: number,
+  tf: TimeFrame,
+  maxCount: number = 250
+): OHLCData[] {
+  if (!spotCandles || spotCandles.length === 0) return [];
+  const cleanSpot = ensureStrictlyAscending(spotCandles);
+  if (cleanSpot.length === 0) return [];
+
+  const contractCandles: OHLCData[] = [];
+
+  // Helper to compute statistical contract probability for a spot price at a given candle timestamp
+  function priceToContractOdds(price: number, candleTime: number, strike: number): number {
+    if (price <= 0 || strike <= 0) return 0.50;
+    const windowStart = Math.floor(candleTime / 300) * 300;
+    const elapsed = Math.min(300, Math.max(0, candleTime - windowStart));
+    const remainingSec = Math.max(1, 300 - elapsed);
+
+    const diff = price - strike;
+    const sigma = Math.max(0.0001 * strike, (strike * 0.0006) * Math.sqrt(remainingSec / 60));
+    const z = diff / sigma;
+    const prob = 1 / (1 + Math.exp(-1.702 * z));
+    return Math.min(0.99, Math.max(0.01, Math.round(prob * 1000) / 1000));
+  }
+
+  // Group spot candles by 5-minute windows
+  const windowMap = new Map<number, OHLCData[]>();
+  for (const c of cleanSpot) {
+    const wTs = Math.floor(c.time / 300) * 300;
+    if (!windowMap.has(wTs)) windowMap.set(wTs, []);
+    windowMap.get(wTs)!.push(c);
+  }
+
+  for (const [wTs, candlesInWindow] of windowMap.entries()) {
+    const windowStrike =
+      wTs === currentWindowTs && strikePrice > 0
+        ? strikePrice
+        : candlesInWindow[0]?.open || strikePrice || 50000;
+
+    let marketOffset = 0;
+    if (wTs === currentWindowTs && currentMarketUpPrice > 0 && currentMarketUpPrice < 1) {
+      const latestSpot = candlesInWindow[candlesInWindow.length - 1]?.close || windowStrike;
+      const latestTime = candlesInWindow[candlesInWindow.length - 1]?.time || wTs;
+      const theoOdds = priceToContractOdds(latestSpot, latestTime, windowStrike);
+      marketOffset = currentMarketUpPrice - theoOdds;
+    }
+
+    for (const sc of candlesInWindow) {
+      const rawO = priceToContractOdds(sc.open, sc.time, windowStrike);
+      const rawH = priceToContractOdds(sc.high, sc.time, windowStrike);
+      const rawL = priceToContractOdds(sc.low, sc.time, windowStrike);
+      const rawC = priceToContractOdds(sc.close, sc.time, windowStrike);
+
+      const clamp = (val: number) =>
+        Math.min(0.99, Math.max(0.01, Math.round((val + marketOffset) * 1000) / 1000));
+
+      const o = clamp(rawO);
+      const c = clamp(rawC);
+      const h = Math.max(o, c, clamp(rawH));
+      const l = Math.min(o, c, clamp(rawL));
+
+      contractCandles.push({
+        time: sc.time,
+        open: o,
+        high: h,
+        low: l,
+        close: c,
+        volume: sc.volume || 10,
+      });
+    }
+  }
+
+  return resampleContractCandles(contractCandles, tf, maxCount);
+}
+
+/**
  * Real-time Chainlink TWAP Accumulator
  */
 export class TwapEngine {
@@ -192,12 +275,32 @@ export class TwapEngine {
     const twapDeltaPct = strike > 0 ? (twapDelta / strike) * 100 : 0;
 
     let requiredPriceToFlip = strike;
+    let projectedFinalTwap = runningTwap;
+    let fairUpProbability = 0.50;
+
     if (secondsLeft > 0 && elapsed > 0) {
       const currentSum = runningTwap * (elapsed + 1);
       const remainingSec = Math.max(1, 300 - elapsed);
       const neededSum = (strike * 300) - currentSum;
       const target = neededSum / remainingSec;
       requiredPriceToFlip = isFinite(target) && !isNaN(target) ? Math.max(0, target) : strike;
+
+      // Projected Final TWAP if current price holds until 300s
+      const currP = currentPrice > 0 ? currentPrice : strike;
+      projectedFinalTwap = (currentSum + (currP * (remainingSec - 1))) / 300;
+
+      // Statistically sound Fair Implied Probability of UP winning
+      const twapDiff = projectedFinalTwap - strike;
+      // Typical micro-volatility scaled by square root of remaining time (in minutes)
+      const sigma = Math.max(0.0001 * strike, (strike * 0.0006) * Math.sqrt(remainingSec / 60));
+      const z = twapDiff / sigma;
+      // Fast logistic approximation of standard normal cumulative distribution function (CDF)
+      const rawProb = 1 / (1 + Math.exp(-1.702 * z));
+      fairUpProbability = Math.min(0.99, Math.max(0.01, Math.round(rawProb * 1000) / 1000));
+    } else {
+      requiredPriceToFlip = strike;
+      projectedFinalTwap = runningTwap;
+      fairUpProbability = runningTwap >= strike ? 0.99 : 0.01;
     }
 
     const isUpWinning = runningTwap >= strike;
@@ -215,6 +318,8 @@ export class TwapEngine {
       twapDelta,
       twapDeltaPct,
       requiredPriceToFlip,
+      projectedFinalTwap,
+      fairUpProbability,
       isUpWinning,
       isUrgent,
       isCritical,
