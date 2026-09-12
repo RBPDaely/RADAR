@@ -13,6 +13,11 @@ if ! command -v bun &> /dev/null; then
     exit 1
 fi
 
+if [ ! -d "node_modules" ]; then
+    echo "[Info] Folder node_modules belum ada. Memasang dependensi otomatis..."
+    bun install
+fi
+
 echo "======================================================"
 echo "           RADAR TERMINAL PRO - POLYMARKET            "
 echo "======================================================"
