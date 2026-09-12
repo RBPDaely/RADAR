@@ -91,6 +91,8 @@ export interface RoundSettlementState {
   twapDelta: number;
   twapDeltaPct: number;
   requiredPriceToFlip: number;
+  projectedFinalTwap?: number;
+  fairUpProbability?: number;
   isUpWinning: boolean;
   isUrgent: boolean;
   isCritical: boolean;
