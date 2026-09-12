@@ -41,7 +41,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
   const [apiKey, setApiKey] = useState<string>('');
   const [apiSecret, setApiSecret] = useState<string>('');
   const [apiPassphrase, setApiPassphrase] = useState<string>('');
-  const [signatureType, setSignatureType] = useState<number>(2); // 2 = POLY_GNOSIS_SAFE
+  const [signatureType, setSignatureType] = useState<number>(-1); // -1 = Auto-Detect
 
   const [showPrivateKey, setShowPrivateKey] = useState<boolean>(false);
   const [showSecret, setShowSecret] = useState<boolean>(false);
@@ -573,9 +573,10 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                       isDark ? 'bg-[#1e222d] border-[#2a2e39] text-white' : 'bg-white border-slate-300'
                     }`}
                   >
-                    <option value={2}>POLY_GNOSIS_SAFE (Rekomendasi - Akun Email/Google)</option>
-                    <option value={1}>POLY_PROXY (Akun Email Generasi Lama)</option>
-                    <option value={0}>EOA (Metamask / Private Key Standar)</option>
+                    <option value={-1}>Auto-Detect (Rekomendasi - Otomatis Cek Saldo Proxy/Safe/EOA)</option>
+                    <option value={1}>POLY_PROXY (Polymarket Proxy Wallet - Akun Email/Google)</option>
+                    <option value={2}>POLY_GNOSIS_SAFE (Gnosis Safe - Browser / Smart Contract Wallet)</option>
+                    <option value={0}>EOA (Metamask / Web3 Private Key Standar)</option>
                   </select>
                 </div>
               </div>
