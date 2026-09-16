@@ -6,6 +6,7 @@ export interface RadarCredentials {
   apiSecret?: string;
   apiPassphrase?: string;
   signatureType?: number; // 0 = EOA, 1 = POLY_PROXY, 2 = POLY_GNOSIS_SAFE (default 2)
+  isActive?: boolean; // false when deactivated locally
 }
 
 export interface OrderRequest {
@@ -34,6 +35,7 @@ export interface OrderResponse {
 
 export interface WalletStatus {
   hasCredentials: boolean;
+  isActive?: boolean;
   funderAddress?: string;
   signerAddress?: string;
   builderSignerAddress?: string;
