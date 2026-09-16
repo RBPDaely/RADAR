@@ -50,6 +50,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
   const [isResolvingFunder, setIsResolvingFunder] = useState<boolean>(false);
   const [status, setStatus] = useState<{
     hasCredentials: boolean;
+    isActive?: boolean;
     funderAddress?: string;
     signerAddress?: string;
     builderSignerAddress?: string;
@@ -130,7 +131,23 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
         // Fallback to direct Polymarket API fetch if sidecar is unavailable
       }
 
-      // 2. Fallback direct Polymarket API query
+      // 2. Fallback direct Gamma API query
+      try {
+        const gammaRes = await fetch(`https://gamma-api.polymarket.com/public-profile?address=${addr.toLowerCase()}`);
+        if (gammaRes.ok) {
+          const gammaData = await gammaRes.json();
+          if (gammaData && gammaData.proxyWallet) {
+            setFunderAddress(gammaData.proxyWallet);
+            setFeedback({
+              type: 'success',
+              message: `Funder Address (Proxy Safe) berhasil terdeteksi via Gamma API: ${gammaData.proxyWallet.slice(0, 10)}...${gammaData.proxyWallet.slice(-6)}`,
+            });
+            return;
+          }
+        }
+      } catch (ge) {}
+
+      // 3. Fallback direct Polymarket API query
       const url = `https://polymarket.com/api/profile/userData?address=${addr.toLowerCase()}`;
       const res = await fetch(url);
       if (res.ok) {
@@ -180,11 +197,39 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
     }
   }
 
+  async function handleToggleActive(targetState: boolean) {
+    setIsLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`${getSidecarUrl()}/api/credentials/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: targetState }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setFeedback({
+          type: 'success',
+          message: targetState
+            ? 'Kredensial berhasil diaktifkan di perangkat ini.'
+            : 'Kredensial dinonaktifkan di perangkat ini. Terminal beralih ke mode Read-Only.',
+        });
+        fetchStatus();
+      } else {
+        setFeedback({ type: 'error', message: data.message || 'Gagal mengubah status aktif kredensial.' });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: `Gagal menghubungi server sidecar: ${err.message}` });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleSave() {
-    if (!signerPrivateKey.trim()) {
+    if (!status?.hasCredentials && !signerPrivateKey.trim()) {
       setFeedback({
         type: 'error',
-        message: 'Signer Private Key wajib diisi untuk menandatangani EIP-712 order ke Polymarket CLOB.',
+        message: 'Signer Private Key wajib diisi untuk setup awal kredensial ke Polymarket CLOB.',
       });
       return;
     }
@@ -198,7 +243,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           funderAddress: funderAddress.trim() || undefined,
-          signerPrivateKey: signerPrivateKey.trim(),
+          signerPrivateKey: signerPrivateKey.trim() || undefined,
           builderSignerAddress: builderSignerAddress.trim() || undefined,
           apiKey: apiKey.trim() || undefined,
           apiSecret: apiSecret.trim() || undefined,
@@ -209,7 +254,17 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
 
       const data = await res.json();
       if (res.ok && data.success) {
+        if (data.walletStatus) {
+          setStatus(data.walletStatus);
+          if (data.walletStatus.funderAddress) {
+            setFunderAddress(data.walletStatus.funderAddress);
+          }
+          if (data.walletStatus.signatureType !== undefined) {
+            setSignatureType(data.walletStatus.signatureType);
+          }
+        }
         setFeedback({ type: 'success', message: data.message || 'Kredensial berhasil disimpan dan diverifikasi!' });
+        setSignerPrivateKey(''); // Clear input for security
         fetchStatus();
       } else {
         setFeedback({ type: 'error', message: data.message || 'Gagal memverifikasi kredensial.' });
@@ -222,7 +277,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
   }
 
   async function handlePurge() {
-    if (!confirm('Apakah Anda yakin ingin menghapus seluruh kredensial trading dari penyimpanan lokal?')) {
+    if (!confirm('Apakah Anda yakin ingin menghapus seluruh kredensial trading dari penyimpanan lokal dan memori server perangkat ini?')) {
       return;
     }
 
@@ -236,7 +291,8 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
         setApiSecret('');
         setApiPassphrase('');
         setStatus(null);
-        setFeedback({ type: 'success', message: 'Seluruh kredensial lokal berhasil dihapus.' });
+        setFeedback({ type: 'success', message: 'Seluruh kredensial dan sesi lokal berhasil dihapus total dari perangkat ini.' });
+        fetchStatus();
       }
     } catch (e) {
       setFeedback({ type: 'error', message: 'Gagal menghubungi server sidecar.' });
@@ -432,7 +488,7 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] text-[#787b86] font-bold uppercase">
-                      2. SIGNER PRIVATE KEY (Export dari Magic Link): *
+                      2. SIGNER PRIVATE KEY (Export dari Magic Link): {status?.hasCredentials ? '(Tersimpan - Boleh Kosong jika tidak diubah)' : '*'}
                     </label>
                     <div className="flex items-center space-x-2">
                       <a
@@ -455,7 +511,11 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                   </div>
                   <input
                     type={showPrivateKey ? 'text' : 'password'}
-                    placeholder="0x... (Private Key untuk menandatangani EIP-712 order)"
+                    placeholder={
+                      status?.hasCredentials
+                        ? '●●●●●●●● (Kunci tersimpan aman. Kosongkan jika hanya memperbarui API Key hasil Reset Akses)'
+                        : '0x... (Private Key untuk menandatangani EIP-712 order)'
+                    }
                     value={signerPrivateKey}
                     onChange={(e) => setSignerPrivateKey(e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg border text-xs font-mono outline-none transition-all ${
@@ -583,18 +643,55 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
 
               {/* Current Status Card */}
               {status && status.hasCredentials && (
-                <div className="p-3 rounded-xl border border-[#089981]/40 bg-[#089981]/10 text-xs space-y-1.5">
-                  <div className="flex items-center justify-between text-[#089981] font-bold">
+                <div
+                  className={`p-3.5 rounded-xl border text-xs space-y-2.5 ${
+                    status.isActive !== false
+                      ? 'border-[#089981]/40 bg-[#089981]/10 text-emerald-300'
+                      : 'border-amber-500/40 bg-amber-950/20 text-amber-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold">
                     <div className="flex items-center space-x-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Kredensial Aktif &amp; Terhubung</span>
+                      {status.isActive !== false ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-[#089981]" />
+                          <span className="text-[#089981]">Kredensial Aktif di Perangkat Ini</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-4 h-4 text-amber-400" />
+                          <span className="text-amber-400">Kredensial Dinonaktifkan di Sini (Read-Only)</span>
+                        </>
+                      )}
                     </div>
-                    {status.clobAuthValid && (
-                      <span className="text-[10px] bg-[#089981]/20 text-[#089981] px-2 py-0.5 rounded border border-[#089981]/40 font-mono">
-                        CLOB AUTH OK
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {status.isActive !== false && status.clobAuthValid && (
+                        <span className="text-[10px] bg-[#089981]/20 text-[#089981] px-2 py-0.5 rounded border border-[#089981]/40 font-mono">
+                          CLOB AUTH OK
+                        </span>
+                      )}
+                      {status.isActive !== false ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(false)}
+                          disabled={isLoading}
+                          className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-[11px] transition-all flex items-center space-x-1"
+                        >
+                          <span>⏸ Nonaktifkan di Sini</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(true)}
+                          disabled={isLoading}
+                          className="px-2.5 py-1 rounded bg-[#089981]/20 hover:bg-[#089981]/30 text-emerald-300 border border-[#089981]/40 font-bold text-[11px] transition-all flex items-center space-x-1"
+                        >
+                          <span>▶ Aktifkan Kembali</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+
                   <div className="text-[10px] text-[#787b86]">
                     Funder (Safe):{' '}
                     <span className="text-white font-mono">
@@ -610,10 +707,15 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                       <span className="ml-1 text-emerald-400 font-bold"> (Cocok dengan Builder)</span>
                     )}
                   </div>
-                  {status.usdcBalance !== undefined && (
+                  {status.isActive !== false && status.usdcBalance !== undefined && (
                     <div className="text-[10px] text-[#787b86]">
-                      Saldo USDC.e (Polygon):{' '}
+                      Saldo USDC.e / pUSD (Polygon):{' '}
                       <strong className="text-[#f0b90b] text-xs">${status.usdcBalance.toFixed(2)}</strong>
+                    </div>
+                  )}
+                  {status.isActive === false && (
+                    <div className="text-[11px] text-amber-300/90 leading-relaxed p-2 rounded bg-amber-950/40 border border-amber-500/20">
+                      💡 <strong>Perangkat ini beralih ke mode pantau (Read-Only).</strong> Saldo dan posisi disembunyikan dan fungsi order dikunci, sehingga Anda dapat bebas mengoperasikan trading di perangkat lain tanpa bentrok!
                     </div>
                   )}
                 </div>
