@@ -60,28 +60,66 @@ const server = Bun.serve({
       // 3. Save / Update Credentials
       if (url.pathname === '/api/credentials' && req.method === 'POST') {
         const body = (await req.json()) as RadarCredentials;
-        if (!body.signerPrivateKey) {
+        const existing = loadCredentials();
+        const rawKey = (body.signerPrivateKey || existing?.signerPrivateKey || '').trim().replace(/^["']|["']$/g, '');
+        if (!rawKey) {
           return jsonResponse({
             success: false,
             message: 'Signer Private Key diperlukan untuk menandatangani EIP-712 order. Ekspor dari https://reveal.magic.link/polymarket dengan email akun Anda.',
           }, 400);
         }
 
-        saveCredentials(body);
-        const initResult = await clobManager.initClient(body);
+        const effectiveKey = rawKey.startsWith('0x') ? rawKey : `0x${rawKey}`;
+
+        const mergedCreds: RadarCredentials = {
+          funderAddress: body.funderAddress?.trim() || existing?.funderAddress || '',
+          signerPrivateKey: effectiveKey,
+          builderSignerAddress: body.builderSignerAddress?.trim() || existing?.builderSignerAddress,
+          apiKey: body.apiKey?.trim() || existing?.apiKey,
+          apiSecret: body.apiSecret?.trim() || existing?.apiSecret,
+          apiPassphrase: body.apiPassphrase?.trim() || existing?.apiPassphrase,
+          signatureType: (body.signatureType !== undefined && body.signatureType >= 0)
+            ? body.signatureType
+            : (existing?.signatureType ?? 1),
+          isActive: true,
+        };
+
+        saveCredentials(mergedCreds);
+        const initResult = await clobManager.initClient(mergedCreds);
         if (!initResult.success) {
           return jsonResponse({ success: false, message: initResult.error || 'Gagal inisialisasi' }, 400);
         }
 
         const walletStatus = await clobManager.getWalletStatus();
-        return jsonResponse({ success: true, message: 'Kredensial berhasil disimpan dan diverifikasi!', walletStatus });
+        return jsonResponse({
+          success: true,
+          message: walletStatus.usdcBalance !== undefined
+            ? `Kredensial diverifikasi! Saldo terdeteksi: $${walletStatus.usdcBalance.toFixed(2)}`
+            : 'Kredensial berhasil disimpan dan diverifikasi!',
+          walletStatus,
+        });
       }
 
       // 4. Purge Credentials
       if (url.pathname === '/api/credentials' && req.method === 'DELETE') {
         purgeCredentials();
-        clobManager.initFromStorage();
-        return jsonResponse({ success: true, message: 'Seluruh kredensial lokal berhasil dihapus.' });
+        clobManager.purgeState();
+        return jsonResponse({ success: true, message: 'Seluruh kredensial dan sesi aktif berhasil dihapus dari perangkat ini.' });
+      }
+
+      // 4b. Toggle Active Status (Nonaktifkan / Aktifkan di Perangkat Ini)
+      if (url.pathname === '/api/credentials/toggle' && req.method === 'POST') {
+        const body = (await req.json()) as { active: boolean };
+        await clobManager.toggleActive(!!body.active);
+        const walletStatus = await clobManager.getWalletStatus();
+        return jsonResponse({
+          success: true,
+          isActive: !!body.active,
+          message: body.active
+            ? 'Kredensial berhasil diaktifkan kembali di perangkat ini.'
+            : 'Kredensial berhasil dinonaktifkan di perangkat ini. Terminal beralih ke mode Read-Only.',
+          walletStatus,
+        });
       }
 
       // 5. Positions
