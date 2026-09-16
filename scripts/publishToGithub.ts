@@ -4,10 +4,32 @@ import * as path from 'path';
 const GITHUB_USERNAME = 'RBPDaely';
 const REPO_NAME = 'RADAR';
 
-const token = process.env.GITHUB_TOKEN || process.argv[2];
+function getGithubToken(): string {
+  if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN.trim();
+  if (process.argv[2]) return process.argv[2].trim();
+
+  const localEnvPath = path.resolve(__dirname, '..', '.env');
+  if (fs.existsSync(localEnvPath)) {
+    const content = fs.readFileSync(localEnvPath, 'utf-8');
+    const match = content.match(/^GITHUB_TOKEN=(.+)$/m);
+    if (match && match[1]) return match[1].trim().replace(/^["']|["']$/g, '');
+  }
+
+  const homeEnvPath = path.join(process.env.HOME || '/home/mkz', '.env');
+  if (fs.existsSync(homeEnvPath)) {
+    const content = fs.readFileSync(homeEnvPath, 'utf-8');
+    const match = content.match(/^GITHUB_TOKEN=(.+)$/m);
+    if (match && match[1]) return match[1].trim().replace(/^["']|["']$/g, '');
+  }
+
+  return '';
+}
+
+const token = getGithubToken();
 
 if (!token) {
   console.error('[Error] GitHub Personal Access Token belum disediakan.');
+  console.error('Silakan simpan token di ~/.env (GITHUB_TOKEN=ghp_...) atau jalankan: bun run scripts/publishToGithub.ts <TOKEN>');
   process.exit(1);
 }
 
