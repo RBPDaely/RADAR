@@ -4,7 +4,15 @@ import { RadarCredentials, OrderRequest, OrderResponse, WalletStatus } from './t
 import { loadCredentials, saveCredentials } from './storage';
 
 export const POLYGON_RPC_URL = 'https://polygon-bor-rpc.publicnode.com';
+export const POLYGON_RPC_FALLBACKS = [
+  'https://polygon-bor-rpc.publicnode.com',
+  'https://polygon-rpc.com',
+  'https://1rpc.io/matic',
+  'https://rpc.ankr.com/polygon',
+];
 export const USDC_E_POLYGON = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+export const USDC_NATIVE_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+export const PUSD_POLYGON = '0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb';
 export const CTF_EXCHANGE_POLYGON = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
 
 const ERC20_ABI = [
@@ -17,24 +25,62 @@ class ClobServiceManager {
   private currentCreds: RadarCredentials | null = null;
   private signer: Wallet | null = null;
   private provider: ethers.JsonRpcProvider;
+  private isActive: boolean = true;
 
   private initPromise: Promise<any> | null = null;
 
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(POLYGON_RPC_URL);
+    this.provider = new ethers.JsonRpcProvider(POLYGON_RPC_URL, 137, { staticNetwork: ethers.Network.from(137) });
     this.initFromStorage();
   }
 
   public initFromStorage() {
     const creds = loadCredentials();
     if (creds && creds.signerPrivateKey) {
-      this.initPromise = this.initClient(creds);
+      this.isActive = creds.isActive !== false;
+      if (this.isActive) {
+        this.initPromise = this.initClient(creds);
+      } else {
+        this.currentCreds = creds;
+        this.client = null;
+        this.signer = null;
+      }
+    } else {
+      this.purgeState();
     }
+  }
+
+  public purgeState() {
+    this.client = null;
+    this.signer = null;
+    this.currentCreds = null;
+    this.initPromise = null;
+    this.isActive = false;
+    console.log('[Sidecar] Kredensial dan sesi lokal berhasil dibersihkan total dari memori.');
+  }
+
+  public async toggleActive(active: boolean): Promise<{ success: boolean; isActive: boolean }> {
+    this.isActive = active;
+    if (this.currentCreds) {
+      this.currentCreds.isActive = active;
+      saveCredentials(this.currentCreds);
+    }
+    if (!active) {
+      this.client = null;
+      this.signer = null;
+      this.initPromise = null;
+      console.log('[Sidecar] Kredensial dinonaktifkan di perangkat ini.');
+    } else {
+      console.log('[Sidecar] Kredensial diaktifkan kembali di perangkat ini.');
+      this.initFromStorage();
+    }
+    return { success: true, isActive: this.isActive };
   }
 
   public async initClient(creds: RadarCredentials): Promise<{ success: boolean; error?: string }> {
     try {
-      let cleanKey = creds.signerPrivateKey.trim();
+      this.isActive = creds.isActive !== false;
+      let cleanKey = creds.signerPrivateKey.trim().replace(/^["']|["']$/g, '');
       if (!cleanKey.startsWith('0x')) {
         cleanKey = `0x${cleanKey}`;
       }
@@ -48,7 +94,7 @@ class ClobServiceManager {
         return (this.signer as any).signTypedData(domain, cleanTypes, value);
       };
       
-      // Auto-resolve real proxy/funder wallet from Polymarket profile API
+      // Auto-resolve real proxy/funder wallet from Polymarket profile APIs
       console.log(`[Sidecar] Resolving funder/proxy wallet for signer ${this.signer.address}...`);
       const autoFunder = await this.resolveProxyWallet(this.signer.address);
       let funder = (creds.funderAddress?.trim() && creds.funderAddress.toLowerCase() !== this.signer.address.toLowerCase())
@@ -74,7 +120,7 @@ class ClobServiceManager {
         chosenSigType = SignatureTypeV2.EOA;
       }
 
-      // Initialize initial CLOB v2 client
+      // Initialize initial CLOB v2 client with throwOnError: false to prevent unhandled rejection during setup
       this.client = new ClobClient({
         host: 'https://clob.polymarket.com',
         chain: 137,
@@ -82,7 +128,7 @@ class ClobServiceManager {
         creds: apiCreds,
         signatureType: chosenSigType,
         funderAddress: funder,
-        throwOnError: true,
+        throwOnError: false,
       });
 
       // Check if API credentials work or need to be derived/created via L1 signature
@@ -98,11 +144,22 @@ class ClobServiceManager {
         }
       }
 
-      // If credentials invalid or missing, derive via L1 signature
+      // If credentials invalid or missing, derive via L1 signature safely
       if (!testSuccess) {
         try {
-          console.log('[Sidecar] Deriving or creating API key from signer via L1 signature...');
-          const derived = await this.client.createOrDeriveApiKey();
+          console.log('[Sidecar] Deriving API key from signer via L1 signature...');
+          let derived: any = null;
+          try {
+            derived = await this.client.deriveApiKey();
+          } catch (deriveErr: any) {
+            console.log('[Sidecar] deriveApiKey notice, trying createApiKey:', deriveErr.message || deriveErr);
+            try {
+              derived = await this.client.createApiKey();
+            } catch (createErr: any) {
+              console.warn('[Sidecar] createApiKey notice:', createErr.message || createErr);
+            }
+          }
+
           if (derived && derived.key) {
             creds.apiKey = derived.key;
             creds.apiSecret = derived.secret;
@@ -119,7 +176,7 @@ class ClobServiceManager {
               creds: apiCreds,
               signatureType: chosenSigType,
               funderAddress: funder,
-              throwOnError: true,
+              throwOnError: false,
             });
             console.log('[Sidecar] API Key derived successfully:', derived.key.slice(0, 8) + '...');
           }
@@ -128,12 +185,13 @@ class ClobServiceManager {
         }
       }
 
-      // Auto-detect whether POLY_PROXY (1), POLY_GNOSIS_SAFE (2), or EOA (0) holds the balance
+      // Auto-detect whether POLY_PROXY (1), POLY_GNOSIS_SAFE (2), EOA (0), or POLY_1271 (3) holds the balance
       const sigTypesToTry = Array.from(new Set([
         chosenSigType,
         SignatureTypeV2.POLY_PROXY,
         SignatureTypeV2.POLY_GNOSIS_SAFE,
-        SignatureTypeV2.EOA
+        SignatureTypeV2.EOA,
+        SignatureTypeV2.POLY_1271,
       ]));
 
       let bestClient: ClobClient | null = null;
@@ -149,7 +207,7 @@ class ClobServiceManager {
             creds: apiCreds,
             signatureType: st,
             funderAddress: funder,
-            throwOnError: true,
+            throwOnError: false,
           });
           const balRes = await candidateClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
           if (balRes && !(balRes as any).error) {
@@ -195,8 +253,11 @@ class ClobServiceManager {
         // continue
       }
     }
-    if (!this.currentCreds || !this.signer) {
-      return { hasCredentials: false };
+    if (!this.currentCreds || !this.signer || !this.isActive) {
+      return {
+        hasCredentials: !!this.currentCreds,
+        isActive: this.isActive,
+      };
     }
 
     try {
@@ -233,13 +294,14 @@ class ClobServiceManager {
         }
       }
 
-      // 1b. Self-Healing: If CLOB balance is 0, probe alternative signature types (e.g. 1 vs 2 vs 0)
+      // 1b. Self-Healing: If CLOB balance is 0, probe alternative signature types (1, 2, 0, 3)
       if (usdcBalance === 0 && this.signer && this.currentCreds) {
         const curSig = this.currentCreds.signatureType ?? SignatureTypeV2.POLY_PROXY;
         const alternatives = [
           SignatureTypeV2.POLY_PROXY,
           SignatureTypeV2.POLY_GNOSIS_SAFE,
-          SignatureTypeV2.EOA
+          SignatureTypeV2.EOA,
+          SignatureTypeV2.POLY_1271,
         ].filter(s => s !== curSig);
 
         const apiCreds = (this.currentCreds.apiKey && this.currentCreds.apiSecret && this.currentCreds.apiPassphrase) ? {
@@ -257,7 +319,7 @@ class ClobServiceManager {
               creds: apiCreds,
               signatureType: altSt,
               funderAddress: funder,
-              throwOnError: true,
+              throwOnError: false,
             });
             const altBal = await altClient.getBalanceAllowance({ asset_type: AssetType.COLLATERAL });
             if (altBal && !altBal.error) {
@@ -283,36 +345,55 @@ class ClobServiceManager {
         }
       }
 
-      // 2. Secondary fallback: On-chain RPC balance (checks both USDC.e and Native USDC)
+      // 2. Secondary fallback: On-chain RPC balance (checks pUSD, USDC.e, and Native USDC)
       if (usdcBalance === 0) {
         try {
-          const USDC_NATIVE_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
-          const tokens = [USDC_E_POLYGON, USDC_NATIVE_POLYGON];
+          const tokens = [PUSD_POLYGON, USDC_E_POLYGON, USDC_NATIVE_POLYGON];
           const checkAddresses = Array.from(new Set([funder, signerAddr]));
 
-          for (const addr of checkAddresses) {
-            for (const tokenAddr of tokens) {
-              try {
-                const contract = new ethers.Contract(tokenAddr, ERC20_ABI, this.provider);
-                const bal = await contract.balanceOf(addr);
-                const onchainBal = parseFloat(ethers.formatUnits(bal, 6));
-                if (onchainBal > 0) {
-                  usdcBalance = Math.max(usdcBalance, onchainBal);
+          const rpcList = [POLYGON_RPC_URL, ...POLYGON_RPC_FALLBACKS.filter(r => r !== POLYGON_RPC_URL)];
+          let rpcSuccess = false;
+
+          for (const rpcUrl of rpcList) {
+            if (rpcSuccess) break;
+            try {
+              const testProvider = new ethers.JsonRpcProvider(rpcUrl, 137, { staticNetwork: ethers.Network.from(137) });
+              for (const addr of checkAddresses) {
+                for (const tokenAddr of tokens) {
+                  try {
+                    const contract = new ethers.Contract(tokenAddr, ERC20_ABI, testProvider);
+                    const bal = await Promise.race([
+                      contract.balanceOf(addr),
+                      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), 3000)),
+                    ]);
+                    const onchainBal = parseFloat(ethers.formatUnits(bal, 6));
+                    if (onchainBal > 0) {
+                      usdcBalance = Math.max(usdcBalance, onchainBal);
+                      console.log(`[Sidecar] On-chain balance detected for ${addr} on token ${tokenAddr}: $${onchainBal} via ${rpcUrl}`);
+                    }
+                    if (!hasAllowance) {
+                      const allow = await Promise.race([
+                        contract.allowance(addr, CTF_EXCHANGE_POLYGON),
+                        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('RPC Timeout')), 3000)),
+                      ]);
+                      if (allow > 0n) hasAllowance = true;
+                    }
+                  } catch {}
                 }
-                if (!hasAllowance) {
-                  const allow = await contract.allowance(addr, CTF_EXCHANGE_POLYGON);
-                  if (allow > 0n) hasAllowance = true;
-                }
-              } catch {}
+              }
+              rpcSuccess = true;
+            } catch (rpcErr) {
+              console.warn(`[Sidecar] RPC ${rpcUrl} error:`, rpcErr);
             }
           }
-        } catch (rpcErr) {
-          console.warn('[Sidecar] Polygon RPC check notice:', rpcErr);
+        } catch (generalRpcErr) {
+          console.warn('[Sidecar] Polygon RPC check notice:', generalRpcErr);
         }
       }
 
       return {
         hasCredentials: true,
+        isActive: this.isActive,
         funderAddress: funder,
         signerAddress: signerAddr,
         builderSignerAddress: builderAddr,
@@ -325,12 +406,19 @@ class ClobServiceManager {
     } catch (e: any) {
       return {
         hasCredentials: true,
+        isActive: this.isActive,
         error: e.message || 'Error checking wallet status',
       };
     }
   }
 
   public async executeOrder(req: OrderRequest, side: 'BUY' | 'SELL'): Promise<OrderResponse> {
+    if (!this.isActive) {
+      return {
+        success: false,
+        message: 'Kredensial dinonaktifkan pada perangkat ini. Aktifkan kembali di menu KREDENSIAL.',
+      };
+    }
     if (!this.client || !this.signer) {
       return {
         success: false,
@@ -502,23 +590,45 @@ class ClobServiceManager {
   }
 
   public async resolveProxyWallet(signerAddress: string): Promise<string | null> {
+    const clean = signerAddress.trim().toLowerCase();
+
+    // Tier 1: Polymarket Gamma Public Profile API
     try {
-      const clean = signerAddress.trim().toLowerCase();
-      const res = await fetch(`https://polymarket.com/api/profile/userData?address=${clean}`);
+      const res = await fetch(`https://gamma-api.polymarket.com/public-profile?address=${clean}`, {
+        headers: { 'User-Agent': 'RADAR-Terminal/1.0' },
+      });
       if (res.ok) {
         const data = await res.json();
         if (data && data.proxyWallet && ethers.isAddress(data.proxyWallet)) {
+          console.log(`[CLOB] Proxy wallet resolved via Gamma API: ${data.proxyWallet}`);
           return data.proxyWallet;
         }
       }
-    } catch (e) {
-      console.warn('[CLOB] Error resolving proxy wallet:', e);
+    } catch (e: any) {
+      console.warn('[CLOB] Gamma API proxy resolution notice:', e.message || e);
     }
+
+    // Tier 2: Polymarket Web Profile API
+    try {
+      const res = await fetch(`https://polymarket.com/api/profile/userData?address=${clean}`, {
+        headers: { 'User-Agent': 'RADAR-Terminal/1.0' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.proxyWallet && ethers.isAddress(data.proxyWallet)) {
+          console.log(`[CLOB] Proxy wallet resolved via Polymarket API: ${data.proxyWallet}`);
+          return data.proxyWallet;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[CLOB] Polymarket API proxy resolution notice:', e.message || e);
+    }
+
     return null;
   }
 
   public async getUserPositions(): Promise<any[]> {
-    if (!this.currentCreds) return [];
+    if (!this.isActive || !this.currentCreds) return [];
     const funder = this.currentCreds.funderAddress || (this.signer ? this.signer.address : null);
     if (!funder) return [];
 
