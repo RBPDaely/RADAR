@@ -1,8 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { RadarCredentials } from './types';
 
-const CREDENTIALS_FILE = path.resolve(process.cwd(), '.radar_credentials.json');
+const __filename = typeof import.meta.url === 'string' ? fileURLToPath(import.meta.url) : '';
+const __dirname = __filename ? path.dirname(__filename) : (import.meta.dir || process.cwd());
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const CREDENTIALS_FILE = path.resolve(PROJECT_ROOT, '.radar_credentials.json');
 
 export function loadCredentials(): RadarCredentials | null {
   try {
