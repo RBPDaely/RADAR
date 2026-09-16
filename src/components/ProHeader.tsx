@@ -36,6 +36,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
   onOpenSettings,
 }) => {
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [isDeactivated, setIsDeactivated] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -44,14 +45,19 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
         const res = await fetch(`${getSidecarUrl()}/api/credentials/status`);
         if (res.ok) {
           const data = await res.json();
-          if (active && data.usdcBalance !== undefined) {
-            setUsdcBalance(data.usdcBalance);
+          if (active) {
+            setIsDeactivated(data.hasCredentials && data.isActive === false);
+            if (data.hasCredentials && data.isActive !== false && data.usdcBalance !== undefined) {
+              setUsdcBalance(data.usdcBalance);
+            } else {
+              setUsdcBalance(null);
+            }
           }
         }
       } catch {}
     }
     checkBalance();
-    const interval = setInterval(checkBalance, 4000);
+    const interval = setInterval(checkBalance, 2500);
     return () => {
       active = false;
       clearInterval(interval);
@@ -215,14 +221,16 @@ export const ProHeader: React.FC<ProHeaderProps> = ({
           <button
             onClick={onOpenSettings}
             className={`flex items-center space-x-1 px-2 py-0.5 rounded-lg text-xs font-mono font-black border transition-all ${
-              isDark
+              isDeactivated
+                ? 'bg-amber-950/40 border-amber-500/50 text-amber-400 hover:border-amber-400'
+                : isDark
                 ? 'bg-[#1e222d] hover:bg-[#2a2e39] border-[#2a2e39] text-[#f0b90b] hover:border-[#f0b90b]/50'
                 : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-amber-700'
             }`}
-            title="Pengaturan Kredensial Polymarket"
+            title={isDeactivated ? 'Kredensial Dinonaktifkan di Perangkat Ini' : 'Pengaturan Kredensial Polymarket'}
           >
             <Key className="w-3 h-3 text-[#f0b90b]" />
-            <span className="hidden sm:inline">KREDENSIAL</span>
+            <span className="hidden sm:inline">{isDeactivated ? 'NONAKTIF' : 'KREDENSIAL'}</span>
           </button>
 
           {/* Latency Ping Badge */}
