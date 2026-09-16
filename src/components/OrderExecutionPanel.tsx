@@ -83,22 +83,34 @@ export const OrderExecutionPanel: React.FC<OrderExecutionPanelProps> = ({
       if (statusRes.ok) {
         const data = await statusRes.json();
         setSidecarConnected(true);
-        setHasCredentials(Boolean(data.hasCredentials));
-        if (data.usdcBalance !== undefined) {
+        const activeCreds = Boolean(data.hasCredentials && data.isActive !== false);
+        setHasCredentials(activeCreds);
+        if (activeCreds && data.usdcBalance !== undefined) {
           setUsdcBalance(data.usdcBalance);
+        } else {
+          setUsdcBalance(null);
         }
       } else {
         setSidecarConnected(false);
+        setHasCredentials(false);
+        setUsdcBalance(null);
       }
 
       if (posRes.ok) {
         const posData = await posRes.json();
         if (posData.positions && Array.isArray(posData.positions)) {
           setUserPositions(posData.positions);
+        } else {
+          setUserPositions([]);
         }
+      } else {
+        setUserPositions([]);
       }
     } catch {
       setSidecarConnected(false);
+      setHasCredentials(false);
+      setUsdcBalance(null);
+      setUserPositions([]);
     }
   };
 
