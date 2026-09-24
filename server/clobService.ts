@@ -26,6 +26,7 @@ class ClobServiceManager {
   private signer: Wallet | null = null;
   private provider: ethers.JsonRpcProvider;
   private isActive: boolean = true;
+  private lastInitError: string = '';
 
   private initPromise: Promise<any> | null = null;
 
@@ -97,11 +98,19 @@ class ClobServiceManager {
       // Auto-resolve real proxy/funder wallet from Polymarket profile APIs
       console.log(`[Sidecar] Resolving funder/proxy wallet for signer ${this.signer.address}...`);
       const autoFunder = await this.resolveProxyWallet(this.signer.address);
-      let funder = (creds.funderAddress?.trim() && creds.funderAddress.toLowerCase() !== this.signer.address.toLowerCase())
-        ? creds.funderAddress.trim()
-        : (autoFunder || creds.funderAddress?.trim() || this.signer.address);
+      const userProvidedFunder = creds.funderAddress?.trim();
+      let funder = (userProvidedFunder && userProvidedFunder.toLowerCase() !== this.signer.address.toLowerCase())
+        ? userProvidedFunder
+        : (autoFunder || userProvidedFunder || this.signer.address);
       creds.funderAddress = funder;
       console.log(`[Sidecar] Target funder address: ${funder}`);
+
+      if (!userProvidedFunder && !autoFunder) {
+        console.warn(`[Sidecar] PERINGATAN: Funder Address kosong dan deteksi otomatis gagal. Funder fallback ke signer address (${this.signer.address}). Jika akun ini bertipe Magic Link (Email), Funder Address wajib diisi manual dari tombol Deposit di polymarket.com.`);
+        this.lastInitError = 'Funder Address tidak diisi & deteksi otomatis gagal. Salin Funder Address dari tombol Deposit di situs Polymarket.';
+      } else {
+        this.lastInitError = '';
+      }
 
       let apiCreds = undefined;
       if (creds.apiKey && creds.apiSecret && creds.apiPassphrase) {
@@ -152,11 +161,16 @@ class ClobServiceManager {
           try {
             derived = await this.client.deriveApiKey();
           } catch (deriveErr: any) {
-            console.log('[Sidecar] deriveApiKey notice, trying createApiKey:', deriveErr.message || deriveErr);
+            const errStr = deriveErr.message || String(deriveErr);
+            console.log('[Sidecar] deriveApiKey notice, trying createApiKey:', errStr);
             try {
               derived = await this.client.createApiKey();
             } catch (createErr: any) {
-              console.warn('[Sidecar] createApiKey notice:', createErr.message || createErr);
+              const createStr = createErr.message || String(createErr);
+              console.warn('[Sidecar] createApiKey notice:', createStr);
+              if (!this.lastInitError) {
+                this.lastInitError = `Gagal derivasi API Key Polymarket (${errStr || createStr}). Periksa jam sistem atau pembatasan IP.`;
+              }
             }
           }
 
@@ -231,6 +245,11 @@ class ClobServiceManager {
       if (bestClient) {
         this.client = bestClient;
         chosenSigType = detectedSigType;
+        this.lastInitError = '';
+      } else {
+        if (!this.lastInitError) {
+          this.lastInitError = 'Gagal verifikasi saldo CLOB untuk semua Signature Type. Pastikan Funder Address (Deposit Safe) dan Signature Type sesuai.';
+        }
       }
 
       creds.signatureType = chosenSigType;
@@ -402,6 +421,7 @@ class ClobServiceManager {
         clobAuthValid,
         usdcBalance,
         proxyAllowance: hasAllowance,
+        error: !clobAuthValid ? (this.lastInitError || 'Otentikasi CLOB Polymarket belum aktif. Periksa Funder Address dan Signature Type.') : undefined,
       };
     } catch (e: any) {
       return {
@@ -596,6 +616,7 @@ class ClobServiceManager {
     try {
       const res = await fetch(`https://gamma-api.polymarket.com/public-profile?address=${clean}`, {
         headers: { 'User-Agent': 'RADAR-Terminal/1.0' },
+        signal: AbortSignal.timeout(3500),
       });
       if (res.ok) {
         const data = await res.json();
@@ -612,6 +633,7 @@ class ClobServiceManager {
     try {
       const res = await fetch(`https://polymarket.com/api/profile/userData?address=${clean}`, {
         headers: { 'User-Agent': 'RADAR-Terminal/1.0' },
+        signal: AbortSignal.timeout(3500),
       });
       if (res.ok) {
         const data = await res.json();
