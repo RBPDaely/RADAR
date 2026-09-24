@@ -7,6 +7,7 @@
     "start": "bash start.sh",
     "dev": "vite --host",
     "sidecar": "bun run server/index.ts",
+    "dev:all": "bash start.sh",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
