@@ -234,6 +234,16 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
       return;
     }
 
+    if (!funderAddress.trim() && signatureType !== 0) {
+      const proceed = confirm(
+        '⚠️ PERINGATAN FUNDER ADDRESS KOSONG!\n\n' +
+        'Jika akun Polymarket Anda login via Email / Google (Magic Link), Anda WAJIB mengisi Funder Address dengan alamat deposit Polygon Anda (dari situs Polymarket -> Deposit -> Crypto).\n\n' +
+        'Jika dibiarkan kosong, saldo Anda akan terbaca $0.00 dan transaksi akan ditolak CLOB.\n\n' +
+        'Apakah Anda yakin ingin tetap menyimpan tanpa Funder Address?'
+      );
+      if (!proceed) return;
+    }
+
     setIsLoading(true);
     setFeedback(null);
 
@@ -253,21 +263,22 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
       });
 
       const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.walletStatus) {
-          setStatus(data.walletStatus);
-          if (data.walletStatus.funderAddress) {
-            setFunderAddress(data.walletStatus.funderAddress);
-          }
-          if (data.walletStatus.signatureType !== undefined) {
-            setSignatureType(data.walletStatus.signatureType);
-          }
+      if (data.walletStatus) {
+        setStatus(data.walletStatus);
+        if (data.walletStatus.funderAddress) {
+          setFunderAddress(data.walletStatus.funderAddress);
         }
+        if (data.walletStatus.signatureType !== undefined) {
+          setSignatureType(data.walletStatus.signatureType);
+        }
+      }
+
+      if (res.ok && data.success) {
         setFeedback({ type: 'success', message: data.message || 'Kredensial berhasil disimpan dan diverifikasi!' });
         setSignerPrivateKey(''); // Clear input for security
         fetchStatus();
       } else {
-        setFeedback({ type: 'error', message: data.message || 'Gagal memverifikasi kredensial.' });
+        setFeedback({ type: 'error', message: data.message || 'Gagal memverifikasi kredensial ke Polymarket CLOB.' });
       }
     } catch (err: any) {
       setFeedback({ type: 'error', message: `Koneksi gagal: ${err.message}` });
@@ -449,26 +460,27 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                 {/* 1. Funder / Safe Address */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[10px] text-[#787b86] font-bold uppercase">
-                      1. FUNDER ADDRESS (Proxy Safe - Boleh Kosong / Auto-Detect):
+                    <label className="text-[10px] text-[#f0b90b] font-bold uppercase flex items-center space-x-1">
+                      <span>1. FUNDER ADDRESS (Alamat Deposit Polygon Akun Anda):</span>
+                      <span className="text-rose-400">*</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => autoDetectFunder()}
                       disabled={isResolvingFunder}
-                      className="text-[10px] text-[#f0b90b] hover:underline flex items-center space-x-1 font-bold"
+                      className="text-[10px] text-[#f0b90b] hover:underline flex items-center space-x-1 font-bold bg-[#f0b90b]/10 px-2 py-0.5 rounded border border-[#f0b90b]/30"
                     >
                       {isResolvingFunder ? (
                         <Loader2 className="w-3 h-3 animate-spin text-[#f0b90b]" />
                       ) : (
                         <Sparkles className="w-3 h-3 text-[#f0b90b]" />
                       )}
-                      <span>{isResolvingFunder ? 'Mendeteksi...' : '⚡ Deteksi Otomatis'}</span>
+                      <span>{isResolvingFunder ? 'Mendeteksi...' : '⚡ Coba Deteksi Otomatis'}</span>
                     </button>
                   </div>
                   <input
                     type="text"
-                    placeholder="Boleh kosongkan (RADAR akan mendeteksi otomatis dari Signer Address)"
+                    placeholder="0x... (Salin dari polymarket.com -> Tombol 'Deposit' -> Tab Crypto)"
                     value={funderAddress}
                     onChange={(e) => setFunderAddress(e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg border text-xs font-mono outline-none transition-all ${
@@ -477,10 +489,8 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                         : 'bg-white border-slate-300 text-slate-900 focus:border-[#f0b90b]'
                     }`}
                   />
-                  <div className="flex items-center justify-between text-[10px] text-[#787b86] mt-1">
-                    <span>
-                      Cara Manual: Buka <strong>polymarket.com</strong> -&gt; klik tombol <strong>Deposit</strong> (kanan atas) -&gt; salin alamat Polygon.
-                    </span>
+                  <div className="text-[10px] text-[#a0aec0] mt-1 leading-relaxed">
+                    💡 <strong>Wajib untuk Akun Email/Google (Magic Link):</strong> Buka <strong>polymarket.com</strong> -&gt; klik tombol <strong>Deposit</strong> (kanan atas) -&gt; tab <strong>Crypto</strong> -&gt; salin alamat Polygon (<code>0x...</code>) ke sini.
                   </div>
                 </div>
 
@@ -665,10 +675,16 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
-                      {status.isActive !== false && status.clobAuthValid && (
-                        <span className="text-[10px] bg-[#089981]/20 text-[#089981] px-2 py-0.5 rounded border border-[#089981]/40 font-mono">
-                          CLOB AUTH OK
-                        </span>
+                      {status.isActive !== false && (
+                        status.clobAuthValid ? (
+                          <span className="text-[10px] bg-[#089981]/20 text-[#089981] px-2 py-0.5 rounded border border-[#089981]/40 font-mono font-bold">
+                            CLOB AUTH OK
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded border border-rose-500/40 font-mono font-bold">
+                            CLOB AUTH FAILED
+                          </span>
+                        )
                       )}
                       {status.isActive !== false ? (
                         <button
@@ -711,6 +727,24 @@ export const CredentialModal: React.FC<CredentialModalProps> = ({
                     <div className="text-[10px] text-[#787b86]">
                       Saldo USDC.e / pUSD (Polygon):{' '}
                       <strong className="text-[#f0b90b] text-xs">${status.usdcBalance.toFixed(2)}</strong>
+                    </div>
+                  )}
+                  {status.isActive !== false && !status.clobAuthValid && (
+                    <div className="text-[11px] text-rose-300/90 leading-relaxed p-2.5 rounded bg-rose-950/40 border border-rose-500/30 space-y-1">
+                      <div>
+                        ⚠️ <strong>Koneksi Polymarket CLOB Belum Aktif:</strong> Kunci tersimpan di sistem lokal, namun autentikasi ke exchange gagal.
+                      </div>
+                      <div className="text-[10px] text-slate-300 pl-2 border-l border-rose-500/50">
+                        {status.error ? (
+                          <div className="text-rose-400 font-mono mb-1">{status.error}</div>
+                        ) : null}
+                        <div>Solusi cepat:</div>
+                        <ul className="list-disc pl-4 space-y-0.5 mt-0.5 text-[#a0aec0]">
+                          <li>Isi kolom <strong>Funder Address</strong> dengan alamat deposit Polygon dari web Polymarket.</li>
+                          <li>Jika login via Email/Google, pastikan Signature Type adalah <strong>POLY_PROXY (Tipe 1)</strong>.</li>
+                          <li>Pastikan jam sistem komputer Anda sinkron dengan waktu internet (NTP).</li>
+                        </ul>
+                      </div>
                     </div>
                   )}
                   {status.isActive === false && (
