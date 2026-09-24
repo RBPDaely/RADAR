@@ -90,20 +90,35 @@ http://localhost:5173
 
 ---
 
-## Panduan Pengaturan Akun Polymarket (Email / Google)
+## Panduan Pengaturan Kredensial Polymarket di Perangkat Baru
 
-Agar RADAR dapat mendeteksi saldo dan mengeksekusi order dengan uang riil:
+Agar RADAR dapat mendeteksi saldo dan mengeksekusi order dengan uang riil di perangkat baru:
 
-1. Buka `http://localhost:5173` di browser Anda.
-2. Klik tombol **KREDENSIAL** di pojok kanan atas header.
-3. Masukkan data akun Polymarket Anda:
-   - **Funder Address**: Alamat dompet profil Polymarket Anda (Proxy Safe yang memegang saldo USDC.e di Polygon). Dapat dilihat di profil Polymarket atau menu deposit.
-   - **Signer Private Key**: Kunci privat yang diekspor dari akun Polymarket (*Menu Profile -> Settings -> Reveal Private Key*).
-   - *API Key, Secret, Passphrase*: Boleh dikosongkan. Engine Sidecar lokal akan otomatis men-*derive* API key secara kriptografis dari private key Anda.
-4. Klik **Simpan & Verifikasi**. Saldo USDC.e Anda akan langsung terdeteksi seketika pada header terminal.
+1. Buka `http://localhost:5173` di peramban Anda.
+2. Klik tombol **KREDENSIAL** (ikon perisai/kunci) di pojok kanan atas header.
+3. Masukkan data akun Polymarket Anda dengan teliti:
+   - **1. FUNDER ADDRESS (Alamat Deposit Polygon)**:
+     - **WAJIB DIISI** jika Anda login via **Email / Google (Magic Link)**!
+     - Cara ambil: Buka [polymarket.com](https://polymarket.com), klik tombol biru **Deposit** (kanan atas) -> pilih tab **Crypto** -> salin alamat Polygon (`0x...`).
+     - *Catatan: Jangan kosongkan kolom ini. Akun Magic Link menyimpan saldo di Proxy Safe ini, bukan di alamat EOA Signer.*
+   - **2. SIGNER PRIVATE KEY**:
+     - Kunci privat dari portal Magic Link resmi Polymarket: [reveal.magic.link/polymarket](https://reveal.magic.link/polymarket).
+     - Masukkan email akun Anda, ketik 6-digit OTP, lalu salin Private Key (`0x...`).
+   - **3. SIGNATURE TYPE (Tipe Tanda Tangan)**:
+     - Pilih **`POLY_PROXY` (Tipe 1)** jika Anda menggunakan akun **Email / Google**.
+     - Pilih **`EOA` (Tipe 0)** jika Anda login menggunakan **MetaMask / Rabby / Private Key langsung**.
+   - *Kolom Builder (API Key, Secret, Passphrase)*: Boleh dikosongkan. Engine Sidecar lokal akan otomatis men-*derive* API key secara kriptografis dari private key Anda.
+4. Klik **Simpan & Verifikasi**.
+   - Jika berhasil, badge hijau **CLOB AUTH OK** dan saldo USDC Anda akan langsung muncul di panel order!
+   - Jika muncul **CLOB AUTH FAILED**, periksa pesan error spesifik yang tertera di kotak merah modal.
+
+### Troubleshooting: Kredensial Gagal Diverifikasi di Perangkat Baru?
+1. **Sidecar Belum Berjalan**: Pastikan menjalankan dengan `bash start.sh` (atau `bun run dev:all`), bukan hanya `bun run dev`. Sidecar harus aktif di port `3001`.
+2. **Jam Komputer Belum Sinkron (NTP Drift)**: Polymarket CLOB menolak signature jika selisih waktu sistem >30 detik. Jalankan `sudo timedatectl set-ntp true` di Linux.
+3. **Funder Address Salah**: Pastikan menyalin dari tombol **Deposit -> Crypto**, bukan alamat wallet sembarang.
 
 > [!IMPORTANT]
-> Kredensial Anda disimpan secara eksklusif di berkas lokal perangkat Anda (`.radar_credentials.json` dengan izin terisolasi `0600`). File ini sudah masuk dalam `.gitignore` sehingga **TIDAK AKAN PERNAH** bocor atau terunggah ke repositori publik.
+> Kredensial Anda disimpan secara eksklusif di berkas lokal perangkat Anda (`.radar_credentials.json` dengan izin terisolasi `0600`). File ini sudah masuk dalam `.gitignore` sehingga **TIDAK AKAN PERNAH** bocor atau terunggah ke repositori publik. Oleh karena itu, wajar jika saat pertama kali kloning di perangkat baru statusnya adalah `NO KEYS`.
 
 ---
 
