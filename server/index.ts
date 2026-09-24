@@ -91,13 +91,23 @@ const server = Bun.serve({
         }
 
         const walletStatus = await clobManager.getWalletStatus();
-        return jsonResponse({
-          success: true,
-          message: walletStatus.usdcBalance !== undefined
+        let message = 'Kredensial berhasil disimpan dan diverifikasi!';
+        const isSuccess = Boolean(walletStatus.clobAuthValid);
+        if (isSuccess) {
+          message = walletStatus.usdcBalance !== undefined
             ? `Kredensial diverifikasi! Saldo terdeteksi: $${walletStatus.usdcBalance.toFixed(2)}`
-            : 'Kredensial berhasil disimpan dan diverifikasi!',
+            : 'Kredensial berhasil disimpan dan terhubung ke Polymarket CLOB!';
+        } else {
+          message = walletStatus.error
+            ? `Kredensial disimpan lokal, namun verifikasi CLOB gagal: ${walletStatus.error}`
+            : 'Kredensial disimpan lokal, namun otentikasi CLOB Polymarket belum aktif. Jika memakai akun Email/Google, pastikan Funder Address diisi dengan alamat deposit Safe Anda.';
+        }
+
+        return jsonResponse({
+          success: isSuccess,
+          message,
           walletStatus,
-        });
+        }, isSuccess ? 200 : 400);
       }
 
       // 4. Purge Credentials
